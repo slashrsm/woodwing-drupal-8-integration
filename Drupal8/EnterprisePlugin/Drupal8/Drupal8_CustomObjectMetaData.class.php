@@ -47,16 +47,25 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 				$fields = $this->getFieldsFromDrupal($pubChannelInfo, $contentType);
 				require_once dirname(__FILE__).'/Utils.class.php';
 
-				if( is_array($fields) && isset( $fields['fields']) ) {
-					foreach( $fields['fields'] as $field ) {
+				// Add PubChannelId to errors for display.
+				if ($fields && $fields['errors']) foreach ($fields['errors'] as $rawDrupalError) {
+					if ($rawDrupalError) foreach ($rawDrupalError as $drupalError) {
+						$drupalError['pubchannelid'] = $pubChannelInfo->Id;
+						$this->errors[] = $drupalError;
+					}
+				}
+
+				$errors = array();
+				if( is_array($fields) && isset( $fields['custom_fields']) ) {
+					foreach( $fields['custom_fields'] as $field ) {
 						$errors = array();
 						// Create a new DrupalField and get any errors from the field generation.
 						$drupalField = DrupalField::generateFromDrupalFieldDefinition($field, $templateId,
-											$pubChannelInfo->Id, $contentType );
+		                    $pubChannelInfo->Id, $contentType);
 						$errors = array_merge($errors, $drupalField->getErrors());
 
 						// Attempt to create a propertyInfo, and get any errors.
-						$propertyInfos = $drupalField->generatePropertyInfo( true );
+						$propertyInfos = $drupalField->generatePropertyInfo( true, $errors );
 						$errors = array_merge($errors, $drupalField->getErrors());
 
 						// No errors, add the property to the list.
@@ -76,10 +85,10 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 					}
 				}
 
-				// Join in properties for the Promote, Sticky and Comments, Title values.
-				if (is_array($fields) && isset( $fields['publish_properties'])) {
+				// Join in properties for the Promote, Sticky, Title and Status values.
+				if (is_array($fields) && isset( $fields['basic_fields'])) {
 					$drupalField = new DrupalField();
-					$propertyInfos = $drupalField->getSpecialPropertyInfos($templateId, $fields['publish_properties'],
+					$propertyInfos = $drupalField->getSpecialPropertyInfos($templateId, $fields['basic_fields'],
 							$pubChannelInfo->Id, $contentType );
 
 					if ( $drupalField->hasError() ) {
@@ -99,7 +108,7 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 	/**
 	 * Retrieves all field definitions made at Drupal (for all content types).
 	 *
-     * @param AdmPubChannel $pubChannelInfo
+     * @param PubChannelInfo $pubChannelInfo
 	 * @param null|string $contentType The ContentType for which to get the Fields. Default: NULL
 	 * @return array List of field definitions.
 	 */

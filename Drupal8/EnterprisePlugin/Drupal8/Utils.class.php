@@ -27,15 +27,48 @@ class WW_Plugins_Drupal8_Utils
 	const DRUPAL8_PLUGIN_NAME = 'Drupal8';
 
 	/** Constant for the custom ADM properties dialog, used in Admin pages. */
-	const CHANNEL_SEPERATOR = 'C_DPF_CHANNEL_SEPERATOR';
+	const CHANNEL_SEPERATOR = 'C_DPF8_CHANNEL_SEPERATOR';
 	/** Constant used for the Drupal site URL, used in the communication with Drupal. */
-	const CHANNEL_SITE_URL = 'C_DPF_CHANNEL_SITE_URL';
-	/** Constant used for the Oauth Consumer Key, used in the communication with Drupal. */
-	const CHANNEL_CONSUMER_KEY = 'C_DPF_CHANNEL_CONSUMER_KEY';
-	/** Constant used for the Oauth Consumer Secret, used in the communication with Drupal. */
-	const CHANNEL_CONSUMER_SECRET = 'C_DPF_CHANNEL_CONSUMER_SECRET';
+	const CHANNEL_SITE_URL = 'C_DPF8_CHANNEL_SITE_URL';
 	/** Constant used for the Certificate, used when communication is done over SSL. */
-	const CHANNEL_CERTIFICATE = 'C_DPF_CHANNEL_CERTIFICATE';
+	const CHANNEL_CERTIFICATE = 'C_DPF8_CHANNEL_CERTIFICATE';
+
+	/**
+	 * Retrieves configured settings from the Drupal 8 configuration file.
+	 *
+	 * @param string $siteIndex The name of the configured Drupal 8 instance configuration.
+	 *
+	 * @return array An array containing the configuration settings.
+	 */
+	static public function resolveConfigurationSettings( $siteIndex )
+	{
+		$response = array(
+			'url' => '',
+			'username' => '',
+			'password' => '',
+		    'authentication' => '',
+		);
+
+		if ($siteIndex != BizResources::localize( 'LIS_NONE')) {
+			// Include the configuration file containing all our Drupal instance configurations.
+			require_once dirname(__FILE__) . '/config.php';
+			$sites = unserialize( DRUPAL8_SITES );
+
+			$preparedSites = array();
+			foreach( $sites as $siteKey => $values ){
+				$preparedSites[strval($siteKey)] = $values;
+			}
+
+			if ( array_key_exists( $siteIndex, $preparedSites ) ){
+				$siteInfo = $preparedSites[strval($siteIndex)];
+				$response['url'] = $siteInfo['url'];
+				$response['username'] = $siteInfo['username'];
+				$response['password'] = $siteInfo['password'];
+				$response['authentication'] = 'basic ' . base64_encode( $response['username'] . ':' . $response['password']);
+			}
+		}
+		return $response;
+	}
 
 	/**
 	 * Converts a given DocumentID (of Enterprise) into a content type (of Drupal).
@@ -230,9 +263,8 @@ class WW_Plugins_Drupal8_Utils
 	/**
 	 * Retrieves the form fields from the PublishForm.
 	 *
-	 * @static
 	 * @param object $publishForm The PublishForm from which to get the form fields.
-	 * @param $pattern Optional pattern which Property names should match for to be included in the result.
+	 * @param string $pattern Optional pattern which Property names should match for to be included in the result.
 	 * @return array An array of key / value pairs with values for the form fields.
 	 */
 	public static function getFormFields( $publishForm, $pattern )
@@ -253,8 +285,8 @@ class WW_Plugins_Drupal8_Utils
 				&& is_array($fields[$propertyInfo->Name])
 			) {
 				// N/A / None values need to be translated back to an empty string.
-				if ( $propertyInfo->Type == DrupalField::ENTERPRISE_PROPERTY_TYPE_MULTILIST
-					|| $propertyInfo->Type == DrupalField::ENTERPRISE_PROPERTY_TYPE_LIST
+				if ( $propertyInfo->Type == 'multilist'
+					|| $propertyInfo->Type == 'list'
 				) {
 					foreach ($fields[$propertyInfo->Name] as $key => $value) {
 						if ($value == DrupalField::DRUPAL_VALUE_NA || $value == DrupalField::DRUPAL_VALUE_NONE) {
@@ -269,19 +301,18 @@ class WW_Plugins_Drupal8_Utils
 
 				// If we are dealing with a multilist or multistring, transform selected values back into an array.
 				if ( count($fields[$propertyInfo->Name]) == 1
-					&& ($propertyInfo->Type == DrupalField::ENTERPRISE_PROPERTY_TYPE_MULTILIST 
-                        || $propertyInfo->Type == DrupalField::ENTERPRISE_PROPERTY_TYPE_MULTISTRING)
+					&& ($propertyInfo->Type == 'multilist'
+                        || $propertyInfo->Type == 'multistring')
 				) {
 					$fields[$propertyInfo->Name] = explode(',', $fields[$propertyInfo->Name][0]);
 				}
 
-				// If we are dealing with a dates calculate it back to UTC so the Drupal side can calculate it back to it's own timezone
-				if ( ($propertyInfo->Type == DrupalField::ENTERPRISE_PROPERTY_TYPE_DATE
-						|| $propertyInfo->Type == DrupalField::ENTERPRISE_PROPERTY_TYPE_DATETIME)
-				) {
+				// For type 'datetime', there's nothing to handle since D8 accepts the value as how Enterprise stores it.
+				if( $propertyInfo->Type == 'date' ) {
 					$value = $fields[$propertyInfo->Name][0];
 					if ( !empty($value) ) {
-						$fields[$propertyInfo->Name] = array( strtotime($value) );
+						$ymdTtime = explode( 'T', $value ); // $value = 2014-10-31T00:00:00
+						$fields[$propertyInfo->Name] = array( $ymdTtime[0] );
 					}
 				}
 			}

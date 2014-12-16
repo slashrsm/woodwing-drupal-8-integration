@@ -12,13 +12,9 @@ require_once BASEDIR . '/server/utils/EnterpriseXmlRpcClient.class.php';
 class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 {
 	/**
-	 * @var string|null
+	 * @var null|string
 	 */
-	public $consumerKey = null;
-	/**
-	 * @var string|null
-	 */
-	public $consumerSecret = null;
+	public $site = null;
 	/**
 	 * @var string|null
 	 */
@@ -33,6 +29,11 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	public $publishTarget = null;
 
 	/**
+	 * @var string The authorization string used for basic authentication.
+	 */
+	public $authentication = '';
+
+	/**
 	 * Default constructor.
 	 *
 	 * @param PubPublishTarget $publishTarget
@@ -40,81 +41,25 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	public function __construct( $publishTarget )
 	{
 		$this->resolveChannelData( $publishTarget );
-
-		//$httpClient = $this->createOauthHttpClient( $this->url.'xmlrpc.php', $this->certificate,
-		//	$this->consumerKey, $this->consumerSecret, $this->drupalDatabaseInstanceId );
-
-		$httpClient = $this->createHttpClient( $this->url.'xmlrpc.php?XDEBUG_SESSION_START=1', $this->certificate);
+		$httpClient = $this->createHttpClient( $this->url . 'xmlrpc.php', $this->certificate);
+		$httpClient->setHeaders('Authorization', $this->authentication);
 		parent::__construct($this->url, $httpClient);
 	}
 
 	/**
-	 * Creates the Zend Http Client to talk to a remote site.
-	 * The token is generated for the oauth security.
-	 * Also deals with HTTPS / SSL connections too for which the certificate option must be set.
+	 * Creates a new HTTP Client
 	 *
-	 * @param string $uri The URL to a remote site.
-	 * @param string $localCert File path to the certificate file (PEM). Required for HTTPS (SSL) connection.
-	 * @param string $consumerKey
-	 * @param string $consumerSecret
-	 * @param string $drupalDatabaseInstanceId The Drupal Database Instance Id as recorded on the channel data.
-	 * @throws BizException When HTTPS uri given used without certificate.
-	 * @return Zend_Http_Client
+	 * Uses basic authentication in Drupal to authenticate the request. Using HTTPS / SSL is possible but requires a
+	 * certificate to be set in the channel configuration.
+	 *
+	 * @param $uri The Uri to the Drupal site.
+	 * @param $localCert The certificate to use for SSL connections.
+	 *
+	 * @return Zend_Http_Client The created client.
+	 * @throws BizException Can throw an exception if the client could not be created.
 	 */
-	public function createOauthHttpClient( $uri, $localCert, $consumerKey, $consumerSecret, $drupalDatabaseInstanceId)
-	{
-		$errorMessage = '. Given URL appears to be invalid: ';
-		try {
-			require_once 'Zend/Uri.php';
-			$uri = Zend_Uri::factory( $uri );
-			$isHttps = $uri && $uri->getScheme() == 'https';
-
-		} catch( Zend_Http_Client_Exception $e ) {
-			throw new BizException( null, 'Server', null, $e->getMessage() . $errorMessage  . $uri );
-		} catch( Zend_Uri_Exception $e ) {
-			throw new BizException( null, 'Server', null, $e->getMessage() . $errorMessage  . $uri );
-		}
-
-		require_once 'Zend/Oauth.php';
-		$config = array(
-			'version' => '1.0',
-			'signatureMethod' => 'HMAC-SHA256',
-			'consumerKey' => $consumerKey,
-			'consumerSecret' => $consumerSecret,
-			'requestMethod' => Zend_Oauth::GET,
-			'requestScheme' => Zend_Oauth::REQUEST_SCHEME_HEADER
-		);
-
-		require_once 'Zend/Oauth/Token/Access.php';
-		$token = new Zend_Oauth_Token_Access(); // 2-legged doesn't require a token but Zend_Oauth needs it!
-		$httpClient = $token->getHttpClient($config, $uri);
-
-		$httpClient->setConfig(array('timeout' => 3600));
-		$httpClient->setParameterGet('DrupalDatabaseInstanceId', $drupalDatabaseInstanceId);
-
-		// Because the Zend_XmlRpc_Client class supports SSL, but does not validate certificates / hosts / peers (yet),
-		// its connections are NOT safe! Therefore we use CURL by passing the Zend_Http_Client_Adapter_Curl
-		// adapter into the Zend_Http_Client class for which we set the secure options and certificate.
-		if( $localCert ) {
-			if( !file_exists($localCert) ) {
-				throw new BizException( null, 'Server', null, 'The file "'.$localCert.'" does not exists.' );
-			}
-			if( $isHttps ) {
-				$curlSslOptions = $this->getCurlOptionsForSsl( $localCert );
-				$httpClient->setConfig(	array('adapter' => 'Zend_Http_Client_Adapter_Curl', 'curloptions' => $curlSslOptions,
-					'timeout' => 3600,));
-			}
-		} else {
-			if( $isHttps ) {
-				throw new BizException( null, 'Server', null,'Using HTTPS, but no certificate configured.' );
-			}
-		}
-		return $httpClient;
-	}
-
 	private function createHttpClient( $uri, $localCert )
 	{
-		$localCert = null;
 		try {
 			require_once 'Zend/Uri.php';
 			$uri = Zend_Uri::factory( $uri );
@@ -152,6 +97,10 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 					'Using HTTPS, but no "local_cert" option defined at DRUPAL_SITES setting.' );
 			}
 		}
+
+		// Prevent timeout errors for heavy calls.
+		$httpClient->setConfig(array('timeout' => 3600));
+
 		return $httpClient;
 	}
 
@@ -181,15 +130,18 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	private function resolveChannelData( $publishTarget )
 	{
 		// If any of the credentials / required data are not set we need to attempt to fetch them from the channel.
-		if ( !isset($this->url) || !isset($this->certificate) || !isset($this->consumerKey) || !isset($this->consumerSecret) ) {
-			// Retrieve the Oauth credentials and store them.
+		if ( !isset($this->url) || !isset($this->certificate) ) {
 			require_once BASEDIR . '/server/utils/PublishingUtils.class.php';
 			require_once dirname(__FILE__) . '/Utils.class.php';
 			require_once BASEDIR . '/server/bizclasses/BizAdmPublication.class.php';
 			$publicationChannel = WW_Utils_PublishingUtils::getAdmChannelById($publishTarget->PubChannelID);
-			$this->url = WW_Utils_PublishingUtils::getAdmPropertyValue($publicationChannel, WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL);
-			$this->consumerKey = WW_Utils_PublishingUtils::getAdmPropertyValue($publicationChannel, WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_KEY);
-			$this->consumerSecret = WW_Utils_PublishingUtils::getAdmPropertyValue($publicationChannel, WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_SECRET);
+
+			// URL needs to be resolved through the selected value.
+			$site = WW_Utils_PublishingUtils::getAdmPropertyValue($publicationChannel, WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL);
+			$configuration = WW_Plugins_Drupal8_Utils::resolveConfigurationSettings( $site );
+			$this->url = $configuration['url'];
+			$this->authentication = $configuration['authentication'];
+			$this->site = $site;
 			$this->certificate = WW_Utils_PublishingUtils::getAdmPropertyValue($publicationChannel, WW_Plugins_Drupal8_Utils::CHANNEL_CERTIFICATE);
 			$this->drupalDatabaseInstanceId = BizAdmPublication::getPublishSystemIdForChannel( $publicationChannel->Id );
 			$this->publishTarget = $publishTarget;
@@ -248,6 +200,11 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 			$valueArray = $rpcClient->callRpcService( 'enterprise.testConfig',
 				array()
 			);
+
+			$result['Access'] = array();
+			if ( isset( $valueArray['Access'] ) ) {
+				$result['Access'] = $valueArray['Access'];
+			}
 		} catch( BizException $e ) {
 			$result['Errors'][] = $e->getMessage();
 		}
@@ -269,11 +226,12 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	/**
 	 * Publishes a PublishForm to a Drupal node.
 	 *
+	 * @param Object $dossier
+	 * @param array $values
+	 * @param array $attachments
+	 * @param string $action
+	 * @param bool $preview
 	 * @throws BizException Throws an exception if the node id is set on a Publish action, or unset on an Update action.
-	 * @param $dossier
-	 * @param $publishForm
-	 * @param $values
-	 * @param $attachments
 	 * @return mixed
 	 */
 	public function saveNode ( $dossier, $values, $attachments, $action='Publish', $preview=false )
@@ -327,6 +285,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	 * using the $dossier->ExternalId to identify the dosier to Drupal.
 	 *
 	 * @param Object $dossier
+	 * @throws BizException
 	 * @return array of PubFields containing information from Drupal
 	 */
 	public function removeNode( $dossier )
@@ -373,7 +332,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 				'type'        => $type['type'],
 				'name'        => $type['name'],
 				'description' => $type['description'],
-				'original'    => $type['orig_type'],
+				'original'    => $type['original'],
 			);
 		}
 		return $contentTypes;
@@ -394,23 +353,25 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 		$service = 'enterprise.getFields';
 
 		// Retrieve the field definitions from Drupal.
-		if (!isset($getFieldsResponseCache[$this->consumerKey])) {
-			$getFieldsResponseCache[$this->consumerKey] = $this->callRpcService( $service, array() );
-			$this->saveDrupalDatabaseInstanceId( $service, $getFieldsResponseCache[$this->consumerKey] );
+		if (!isset($getFieldsResponseCache[$this->site])) {
+			$getFieldsResponseCache[$this->site] = $this->callRpcService( $service, array() );
+			$this->saveDrupalDatabaseInstanceId( $service, $getFieldsResponseCache[$this->site] );
 			// A field that is only needed for specific services, so unset it once finished using it.
 			unset ( $getFieldsResponseCache['DrupalDatabaseInstanceId'] );
 
 		}
 
-		if( $getFieldsResponseCache[$this->consumerKey] ) {
+		if( $getFieldsResponseCache[$this->site] ) {
 			if( is_null( $contentType ) ) {
 				// If no specific ContentType is given, merge all values.
-				foreach( $getFieldsResponseCache[$this->consumerKey] as $fieldsOfContentType ) {
+				foreach( $getFieldsResponseCache[$this->site] as $fieldsOfContentType ) {
 					$fields = array_merge( $fields, $fieldsOfContentType );
 				}
 			} else {
 				// If a specific ContentType is provided return the fields for that type only.
-				$fields = $getFieldsResponseCache[$this->consumerKey][ $contentType ];
+				if ( isset($getFieldsResponseCache[ $this->site ][ $contentType ] ) ) {
+					$fields = $getFieldsResponseCache[ $this->site ][ $contentType ];
+				}
 			}
 		}
 		return $fields;
@@ -427,7 +388,6 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	public static function getField( $key, $type, $value )
 	{
 		$result = null;
-		$result = $result; // Keep analyzer happy
 		if( !is_null( $value ) ) {
 			switch( $type ) {
 				case 'int':
@@ -444,6 +404,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 					$value = strval(implode("<br /><br />", $value));
 					$value = array(nl2br($value));
 					$type = 'string';
+					break;
 				default:
 					break;
 			}
@@ -487,6 +448,8 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	/**
 	 * Returns a file id for the specified data.
 	 *
+	 * @todo This is actually legacy from the Drupal 6 plugin, we do not need this in Drupal 8. The xml rpc function has already been removed.
+	 *
 	 * @param $filename
 	 * @param $contentType
 	 * @param $publishedVersion
@@ -514,13 +477,13 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	 * The vocabulary data consists of an array with the ID of the term as the key and the name of the term as a value.
 	 *
 	 * @throws Throws a BizException if the GUID is invalid or does not match the Channel's GUID.
-	 * @param int $vocabularyId The Id of the vocabulary to be retrieved.
+	 * @param string $vocabularyUuid The Id of the vocabulary to be retrieved.
 	 * @return array An array of vocabulary data.
 	 */
-	public function getVocabulary( $vocabularyId )
+	public function getVocabulary( $vocabularyUuid )
 	{
 		$service = 'enterprise.getVocabulary';
-		$result = $this->callRpcService( $service, array( intval($vocabularyId) ) );
+		$result = $this->callRpcService( $service, array( $vocabularyUuid ) );
 		$this->saveDrupalDatabaseInstanceId( $service, $result );
 		// A field that is only needed for specific services, so unset it once finished using it.
 		unset ( $result['DrupalDatabaseInstanceId'] );
@@ -583,11 +546,8 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 		try {
 			// Now it's time to upload the file to Drupal ...
 			require_once 'Zend/Http/Client.php';
-			$url = $this->url . 'index.php';
-			$client = $this->createOauthHttpClient( $url, $this->certificate, $this->consumerKey, $this->consumerSecret,
-				$this->drupalDatabaseInstanceId );
-
-			// Set these three parameters as GET parameters. Otherwise they are not calculated correctly in the oauth signature.
+			$client = $this->createHttpClient( $this->url.'ww_enterprise/upload', $this->certificate);
+			$client->setHeaders('Authorization', $this->authentication );
 			// We need to send them as GET parameters, because Zend is including them in the signature when the enctype is set to
 			// 'multipart/form-data' and Drupal doesn't.
 			$client->setParameterGet( 'q', 'ww_enterprise/upload');
@@ -599,7 +559,9 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 			$response = $client->request( Zend_Http_Client::POST );
 
 			$dom = new DOMDocument();
-			$dom->loadXML( $response->getBody() );
+			$body = $response->getBody();
+			$body = str_replace(PHP_EOL, '', $body);
+			$dom->loadXML( $body );
 			$xpath = new DOMXPath( $dom );
 			$fidNode = $xpath->query('//fid')->item(0);
 			$fileId = $fidNode ? $fidNode->nodeValue : 0;
@@ -660,54 +622,6 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 			LogHandler::Log( 'Drupal', 'ERROR', 'HTTP UPLOAD "'.$action.'" failed at URL "'.$this->url.'".' );
 			throw new BizException( 'ERR_PUBLISH', 'Server', $errMsg,
 				null, array('Drupal', $message));
-		}
-		return $fileId;
-	}
-
-	/**
-	 * Check if the file already exists in Drupal
-	 *
-	 * @param int	 $objectId    Enterprise object id
-	 * @param string $fileName    filename
-	 * @param string $content     file contents
-	 * @param string $contentType file content type
-	 * @param string $version     file version in Enterprise
-	 * @param string $type        file type in Enterprise
-	 * @return array              file information
-	 */
-	private function checkFileExists( $dossier, $publishTarget, $objectId, $filename, $contentType, $version )
-	{
-		$publishedVersion = '';
-		if(!is_null($dossier)) {
-			foreach( $dossier->Relations as $relation ) {
-				foreach( $relation->Targets as $target ) {
-					if( $target->PubChannel->Id == $publishTarget->PubChannelID &&
-						$target->Issue->Id == $publishTarget->IssueID &&
-						$relation->Child == $objectId ) {
-						$publishedVersion = $target->PublishedVersion;
-						break 2; // Break once found the correct target
-					}
-				}
-			}
-		}
-
-		LogHandler::Log( 'Drupal', 'DEBUG', "Current version: $version published version: $publishedVersion" );
-		$fileId = null;
-		if(!empty($publishedVersion) && (trim($publishedVersion) == trim($version))) {
-			LogHandler::Log( 'Drupal', 'DEBUG', 'Look for the file in Drupal.' );
-
-			$response = $this->getFileId($filename, $contentType, $publishedVersion, $dossier);
-			if( isset($response[0]['fid']) ) {
-				$fileId = $response[0]['fid'];
-			}
-
-			// Add debugging information.
-			if( LogHandler::debugMode() ) {
-				$details = "objectId: $objectId, filename: $filename, contentType: $contentType, version: $version";
-				$message = (empty($fileId)) ? 'Did not find the file in Drupal for ' : 'Found file id \''. $fileId
-					.'\' in Drupal for ';
-				LogHandler::Log( 'Drupal', 'DEBUG', $message . $details );
-			}
 		}
 		return $fileId;
 	}

@@ -41,26 +41,28 @@ class Drupal8_AdminProperties extends AdminProperties_EnterpriseConnector
 						new PropertyUsage( WW_Plugins_Drupal8_Utils::CHANNEL_SEPERATOR, true, false, false, false ) );
 				}
 
+				require_once dirname(__FILE__) . '/config.php';
+				$sites = unserialize( DRUPAL8_SITES );
+				$siteKeys = array_keys( $sites );
+				$preparedSiteKeys = array();
+
+				foreach( $siteKeys as $siteKey ){
+					$preparedSiteKeys[strval($siteKey)] = $siteKey;
+				}
+
+				if( !$preparedSiteKeys ){
+					$preparedSiteKeys[] = BizResources::localize( 'LIS_NONE' );
+				}
+
 				// Draw the URL field.
 				$widgets[WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL] = new DialogWidget(
-					new PropertyInfo( WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL, 'Web Site URL', null, 'string', '' ),
-					new PropertyUsage( WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL, true, true, false ));
-
-				// Draw the Consumer Key Field.
-				$widgets[WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_KEY] = new DialogWidget(
-					new PropertyInfo( WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_KEY, 'Consumer Key', null, 'string', '' ),
-					new PropertyUsage( WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_KEY, true, true, false ));
-
-				// Draw the Consumer Secret Field.
-				$widgets[WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_SECRET] = new DialogWidget(
-					new PropertyInfo( WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_SECRET, 'Consumer Secret', null, 'string', '' ),
-					new PropertyUsage( WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_SECRET, true, true, false ));
+					new PropertyInfo( WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL, 'Web Site', null, 'list', null, $preparedSiteKeys ),
+					new PropertyUsage( WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL, true, true, true ));
 
 				// Draw the Certificate field.
 				$widgets[WW_Plugins_Drupal8_Utils::CHANNEL_CERTIFICATE] = new DialogWidget(
 					new PropertyInfo( WW_Plugins_Drupal8_Utils::CHANNEL_CERTIFICATE, 'Certificate', null, 'string', '' ),
 					new PropertyUsage( WW_Plugins_Drupal8_Utils::CHANNEL_CERTIFICATE, true, false, false ));
-
 				break;
 			case 'Issue':
 				break;
@@ -84,9 +86,9 @@ class Drupal8_AdminProperties extends AdminProperties_EnterpriseConnector
 	 * a create action is attempted, do not draw the fields, only at an update should the fields be drawn, and only if
 	 * the old type was a match for this system.
 	 *
-	 * @param $context The context to check.
-	 * @param $entity The entity to check.
-	 * @param $action The action being performed.
+	 * @param AdminProperties_Context $context The context to check.
+	 * @param string $entity The entity to check.
+	 * @param string $action The action being performed.
 	 * @return bool Whether or not the context/entity match the requirements.
 	 */
 	private function isCorrectPublishSystem($context, $entity, $action)
@@ -140,8 +142,6 @@ class Drupal8_AdminProperties extends AdminProperties_EnterpriseConnector
 	 */
 	public function collectDialogWidgetsForContext( AdminProperties_Context $context, $entity, $action )
 	{
-		$action = $action; // keep analyzer happy
-
 		return ($this->isCorrectPublishSystem($context, $entity, $action))
 			? $this->doCollectDialogWidgets( $entity, 'extend_entity')
 			: array();
@@ -153,8 +153,6 @@ class Drupal8_AdminProperties extends AdminProperties_EnterpriseConnector
 	 */
 	final public function buildDialogWidgets( AdminProperties_Context $context, $entity, $action, $allWidgets, &$showWidgets )
 	{
-		$action = $action; $allWidgets = $allWidgets; // keep code analyzer happy
-
 		// This way you can grab contextual data:
 		//$pubObj = $context->getPublication();
 		//$channelObj = $context->getPubChannel();

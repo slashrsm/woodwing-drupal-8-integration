@@ -15,33 +15,15 @@ class Drupal8_AdmModifyPubChannels extends AdmModifyPubChannels_EnterpriseConnec
 
 	final public function runBefore( AdmModifyPubChannelsRequest &$req )
 	{
-		LogHandler::Log( 'Drupal8', 'DEBUG', 'Called: Drupal8_AdmModifyPubChannels->runBefore()' );
-
-		require_once dirname(__FILE__).'/Utils.class.php';
-
-		if ($req->PubChannels) foreach ( $req->PubChannels as $channel ) {
-			if ( $channel->PublishSystem == WW_Plugins_Drupal8_Utils::DRUPAL8_PLUGIN_NAME ) {
-				if ( $channel->ExtraMetaData ) foreach ($channel->ExtraMetaData as $admExtraMetaData ) {
-					// Ensure there is a trailing slash on the URL field.
-					if ($admExtraMetaData->Property == 'C_DPF_CHANNEL_SITE_URL' ) {
-						$admExtraMetaData->Values[0] = rtrim($admExtraMetaData->Values[0], '/') . '/';
-					}
-				}
-			}
-		}
-		LogHandler::Log( 'Drupal8', 'DEBUG', 'Returns: Drupal8_AdmModifyPubChannels->runBefore()' );
-	} 
+	}
 
 	// Not called.
 	final public function runAfter( AdmModifyPubChannelsRequest $req, AdmModifyPubChannelsResponse &$resp )
 	{
-		$req = $req;   // keep code analyzer happy.
-		$resp = $resp; // keep code analyzer happy.
-	} 
+	}
 	
 	// Not called.
 	final public function runOverruled( AdmModifyPubChannelsRequest $req )
 	{
-		$req = $req; // keep code analyzer happy.
-	} 
+	}
 }

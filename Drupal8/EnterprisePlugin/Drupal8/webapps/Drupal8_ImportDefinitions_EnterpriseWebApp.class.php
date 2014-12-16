@@ -15,13 +15,13 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 {
 	/** 
 	 * List of pub channels for which this plugin can publish (with PublishSystem set to
-	 * Drupal 7) and where the admin user has access to.
+	 * Drupal 8) and where the admin user has access to.
 	 *
 	 * @var array $pubChannelInfos List of PubChannelInfo data objects
 	 */
 	private $pubChannelInfos;
 	
-	public function getTitle()      { return 'Import Content Types from Drupal 7'; }
+	public function getTitle()      { return 'Import Content Types from Drupal 8 Beta'; }
 	public function isEmbedded()    { return true; }
 	public function getAccessType() { return 'admin'; }
 	
@@ -70,6 +70,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
                 }
 
                 $this->importCustomObjectProperties();
+
 				$this->importPublishFormDialogs();
 				$htmlBody = $this->printImportResults( $importStatus, $htmlBody );
 			} catch ( BizException $e ) {
@@ -122,6 +123,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 				foreach( $errorMessage as $eachErrorMsg ) {
 
 					// Get the channel related information.
+					$siteUrl = '';
 					if (isset($channelInfos[$eachErrorMsg['pubchannelid']])) {
 						// Use stored information.
 						$channel = $channelInfos[$eachErrorMsg['pubchannelid']]['channel'];
@@ -140,8 +142,9 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 								. $publication->Id . '&channelid=' . $channel->Id;
 
 							// Compose the Site URL.
-							$siteUrl = WW_Utils_PublishingUtils::getAdmPropertyValue($channel,
-								WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL);
+							$selectedSite = WW_Utils_PublishingUtils::getAdmPropertyValue($channel, WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL);
+							$configuration = WW_Plugins_Drupal8_Utils::resolveConfigurationSettings( $selectedSite );
+							$siteUrl = $configuration['url'];
 
 							// Store the data for reuse.
 							$channelInfos[$eachErrorMsg['pubchannelid']] = array();
@@ -289,20 +292,20 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 
 				// Fetching the Vocabulary names (Term Entities) from Drupal8.
 				$drupalVocabNames = $drupalXmlRpcClient->getVocabularyNames();
-				foreach( $drupalVocabNames as /* $drupalVocabName => */$info ) {
+				foreach( $drupalVocabNames as $drupalVocabUuid => $info ) {
 					$termEntity = new AdmTermEntity();
 					$termEntity->Name = $info['name'];
 					$termEntity->AutocompleteProvider = 'Drupal8';
 					$termEntity->PublishSystemId = $publishSystemId;
-
-					// Fetching the Vocabularies (Terms) from Drupal8 given the vocabulary name id from Drupal8.
-					$drupalVocabs = $drupalXmlRpcClient->getVocabulary( $info['vid'] );
 
 					$service = new AdmCreateAutocompleteTermEntitiesService();
 					$request = new AdmCreateAutocompleteTermEntitiesRequest();
 					$request->Ticket = BizSession::getTicket();
 					$request->TermEntities = array( $termEntity );
 					$response = $service->execute( $request );
+
+					// Fetching the Vocabularies (Terms) from Drupal8 given the vocabulary name id from Drupal8.
+					$drupalVocabs = $drupalXmlRpcClient->getVocabulary( $drupalVocabUuid );
 
 					if( $drupalVocabs ) {
 						$service = new AdmCreateAutocompleteTermsService();
@@ -332,7 +335,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 
 		// Delete the Term Entities and all belonging Terms.
         $termEntities = DBAdmAutocompleteTermEntity::getTermEntityByProviderAndPublishSystemId(
-            WW_Plugins_Drupal8_Utils::Drupal8_PLUGIN_NAME, $publishSystemId );
+            WW_Plugins_Drupal8_Utils::DRUPAL8_PLUGIN_NAME, $publishSystemId );
 		if( $termEntities ) {
 			$service = new AdmDeleteAutocompleteTermEntitiesService();
 			$request = new AdmDeleteAutocompleteTermEntitiesRequest();
@@ -346,7 +349,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 	 * Repairs PublishFormTemplates for the Channels if needed.
 	 *
 	 * The way of handling templateNames has changed for Drupal from using the system_name as the unique name part
-	 * of a DocumentId to using the orig_type known by Drupal, therefore it might be necessary to update the old
+	 * of a DocumentId to using the original known by Drupal, therefore it might be necessary to update the old
 	 * templates. This function takes care of that.
 	 *
 	 * @param int $pubChannelId The id of the current PubChannel being repaired.
@@ -363,11 +366,11 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 		$success = false;
 		// The DocumentId of a PublishFormTemplate was formerly based on the system_name of the Drupal ContentType, however
 		// since administrators in Drupal have the freedom to change the system_name, we needed to update the identifier
-		// used in the DocumentId of the PublishFormTemplate, we use the orig_type field from the ContentType for this.
+		// used in the DocumentId of the PublishFormTemplate, we use the original field from the ContentType for this.
 		// This means that we must possibly update any older imported templates before passing them to the core.
 		// Update rules:
 		// If the smart_config flag is set for the channel, we do not run the updates.
-		// If a PublishFormTemplate is known by its old 'type' DocumentId it needs to be updated to one using the 'orig_type'.
+		// If a PublishFormTemplate is known by its old 'type' DocumentId it needs to be updated to one using the 'original'.
 		// If a PublishFormTemplate is known by the new type we don't need to do anything.
 		// If a PublishFormTemplate is not known, we assume it is a new PublishFormTemplate.
 		$channelUpdated = 'Drupal8_' . $pubChannelId . '_documentids_updated';
@@ -432,7 +435,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 							$usages = BizAdmActionProperty::getAdmPropertyUsages($action, $oldTypedDocumentId);
 
 							// If there are usages for the old documentId, remove it as well and let the process later recreate them.
-							if ( count($usages > 0) ) {
+							if ( count( $usages ) > 0 ) {
 								if (!BizAdmActionProperty::deleteAdmPropertyUsageByActionAndDocumentId($action, $oldTypedDocumentId)) {
 									LogHandler::Log('BizPublishing', 'ERROR', 'Removing existing dialog failed for documentID: '
 										. $oldTypedDocumentId . '. Please remove it manually.');
@@ -456,6 +459,9 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 	/**
 	 * Queries the Enterprise DB for PublishTemplate objects. For that it uses 
 	 * the built-in "PublishFormTemplates" Named Query.
+	 *
+	 * @param int $pubChannelId
+	 * @return WflNamedQueryResponse
 	 */
 	private function queryTemplatesFromDb( $pubChannelId )
 	{

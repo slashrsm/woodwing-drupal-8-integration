@@ -67,6 +67,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * @param Object $dossier
 	 * @param Object[] $objectsInDossier
 	 * @param PubPublishTarget $publishTarget
+	 * @throws BizException
 	 * @return PubField[] Array containing information from Drupal.
 	 */
 	public function updateDossier( &$dossier, &$objectsInDossier, $publishTarget )
@@ -108,12 +109,11 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * @param Object $dossier
 	 * @param Object[] $objectsInDossier
 	 * @param PubPublishTarget $publishTarget
+	 * @throws BizException
 	 * @return array of PubFields containing information from Drupal
 	 */
 	public function unpublishDossier( $dossier, $objectsInDossier, $publishTarget )
 	{
-		$objectsInDossier = $objectsInDossier; // Keep analyzer happy.
-
 		// Unpublish the node.
 		require_once dirname(__FILE__) . '/DrupalXmlRpcClient.class.php';
 		$drupalXmlRpcClient = new DrupalXmlRpcClient($publishTarget);
@@ -139,6 +139,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * @param Object $dossier
 	 * @param Object[] $objectsInDossier
 	 * @param PubPublishTarget $publishTarget
+	 * @throws BizException
 	 * @return PubField[] containing information from Publishing system.
 	 */
 	public function previewDossier( &$dossier, &$objectsInDossier, $publishTarget )
@@ -180,6 +181,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * @param Object[] $objectsInDossier
 	 * @param PubPublishTarget $publishTarget The PublishForm Target
 	 * @throws BizException Throws an Exception if the validation fails.
+	 * @return array
 	 */
 	private function prepareNodeValues( $publishForm, $objectsInDossier, $publishTarget )
 	{
@@ -194,6 +196,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 		$values = null;
 
 		$templateId = BizPublishForm::getTemplateId( $publishForm );
+		$attachmentUploaded = array(); // To store EnterpriseId => DrupalId if there's any file uploaded.
 		if (!is_null($templateId)) {
 			$pattern_prefix = '/^C_DPF_' . $templateId;
 			$pattern = $pattern_prefix . '_[A-Z0-9_]{0,}$/';
@@ -226,14 +229,14 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 
 			// Handle attachments to be uploaded to Drupal.
 			//Todo: stream attachments instead of loading them in memory.
-			$attachmentUploaded = array(); // To store EnterpriseId => DrupalId if there's any file uploaded.
 
 			foreach ($values as $field => $value) {
 				// Handle normal file attachments, for example for a file selector or layout.
 				$contentType = $values[WW_Plugins_Drupal8_Utils::DRUPAL8_CONTENT_TYPE][0];
 
-				//Handle file attachments(such as InlineImages) on ArticleComponents.
-				if (is_array($value) && is_array($value[0]) && isset($value[0]['elements'])) {
+				if( is_null( $value )) {
+					$values[$field] = array( null ); // To avoid rpc call truncating null value: In RPC call
+				} elseif (is_array($value) && is_array($value[0]) && isset($value[0]['elements'])) { //Handle file attachments(such as InlineImages) on ArticleComponents.
 					// Get the element contents.
 					$value[0]['elements'] = $value[0]['elements'][0]->Content;
 
@@ -414,13 +417,12 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * Uses the dossier->ExternalId to identify the dossier in Drupal. Called by the core (BizPublishing.class.php).
 	 *
 	 * @param Object $dossier
-	 * @param Object[] $objectsindossier
+	 * @param Object[] $objectsInDossier
 	 * @param PubPublishTarget $publishTarget
 	 * @return PubField[] Array containing information gathered from Drupal.
 	 */
 	public function requestPublishFields( $dossier, $objectsInDossier, $publishTarget )
 	{
-		$objectsInDossier = $objectsInDossier; // keep analyzer happy.
 		$result = array();
 		$map = array(
 			'Views'    => 'int',
@@ -453,13 +455,12 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * Uses the $dossier->ExternalId to identify the dosier to Drupal. (Called by the core, BizPublishing.class.php)
 	 *
 	 * @param Object $dossier
-	 * @param array of Object $objectsindossier
+	 * @param Object[] $objectsInDossier
 	 * @param PubPublishTarget $publishTarget
 	 * @return string The url to the content.
 	 */
 	public function getDossierURL( $dossier, $objectsInDossier, $publishTarget )
 	{
-		$objectsInDossier = $objectsInDossier; // keep analyzer happy
 		require_once dirname(__FILE__).'/DrupalXmlRpcClient.class.php';
 		$drupalXmlRpcClient = new DrupalXmlRpcClient($publishTarget);
 		$url = $drupalXmlRpcClient->getUrl($dossier);
@@ -484,9 +485,6 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 */
 	public function validateDossierForPublishing( $type, $dossierId, $issueId )
 	{
-		$type = $type; // Keep analyzer happy.
-		$dossierId = $dossierId; // Keep analyzer happy.
-		$issueId = $issueId; // Keep analyzer happy.
 		// If Content Station 7.1.x is used you can use this to validate the input before publishing or updaing
 		return array('errors' => array(), 'warnings' => array(), 'infos' => array());
 	}
@@ -529,6 +527,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * Refer to PubPublishing_EnterpriseConnector::getPublishFormTemplates() header.
 	 *
 	 * @param int $pubChannelId The publicationId for which to retrieve the templates, default null.
+	 * @return array
 	 */
 	public function getPublishFormTemplates( $pubChannelId )
 	{
@@ -556,7 +555,6 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	 * This function can return a dialog that is shown in Content Station. This is used for the Multi Channel Publishing Feature.
 	 *
 	 * @since 9.0
-	 * @param Object $publishForm
 	 * @param Object $publishFormTemplate
 	 * @return Dialog|null Dialog definition|The default connector returns null which indicates it doesn't support the getDialog call.
 	 */
@@ -579,8 +577,8 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 		$fields = $this->getFields( $pubChannelId, $contentType );
 		$tab = WW_Utils_PublishingUtils::getPublishingTab( 'GeneralFields' );
 
-		if( is_array( $fields ) && isset($fields['fields']) ) {
-			foreach( $fields['fields'] as $field ) {
+		if( is_array( $fields ) && isset($fields['custom_fields']) ) {
+			foreach( $fields['custom_fields'] as $field ) {
 				$errors = array();
 
 				// Create a new DrupalField and get any errors from the field generation.
@@ -588,7 +586,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 				$errors = array_merge($errors, $drupalField->getErrors());
 
 				// Attempt to create a propertyInfo, and get any errors.
-				$propertyInfos = $drupalField->generatePropertyInfo( );
+				$propertyInfos = $drupalField->generatePropertyInfo(false, $errors);
 				$errors = array_merge($errors, $drupalField->getErrors());
 
 				// No errors, add the property to the list.
@@ -601,10 +599,10 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 						$widget->PropertyUsage = new PropertyUsage();
 						$widget->PropertyUsage->Name            = $widget->PropertyInfo->Name;
 						$widget->PropertyUsage->Editable        = true;
-						$widget->PropertyUsage->Mandatory       = $summaryWidget ? false : $drupalField->getRequired();
+						$widget->PropertyUsage->Mandatory       = $summaryWidget ? false : $drupalField->required;
 						$widget->PropertyUsage->Restricted      = false;
 						$widget->PropertyUsage->RefreshOnChange = false;
-						$widget->PropertyUsage->InitialHeight   = $summaryWidget ? 100 : $drupalField->getInitialHeight();
+						$widget->PropertyUsage->InitialHeight   = $summaryWidget ? $drupalField->sumInitialHeight : $drupalField->initialHeight;
 
 						if ( $widget->PropertyInfo->Widgets ) foreach ( $widget->PropertyInfo->Widgets as &$subWidget ) {
 							$summaryWidget = ( preg_match('/^C_DPF_[0-9]*_[0-9]*_SUM_*/', $subWidget->PropertyInfo->Name ) === 1 );
@@ -612,10 +610,10 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 							$subWidget->PropertyUsage = new PropertyUsage();
 							$subWidget->PropertyUsage->Name            = $subWidget->PropertyInfo->Name;
 							$subWidget->PropertyUsage->Editable        = true;
-							$subWidget->PropertyUsage->Mandatory       = $summaryWidget ? false : $drupalField->getRequired();
+							$subWidget->PropertyUsage->Mandatory       = $summaryWidget ? false : $drupalField->required;
 							$subWidget->PropertyUsage->Restricted      = false;
 							$subWidget->PropertyUsage->RefreshOnChange = false;
-							$subWidget->PropertyUsage->InitialHeight   = $summaryWidget ? 100 : $drupalField->getInitialHeight();
+							$subWidget->PropertyUsage->InitialHeight   = $summaryWidget ? $drupalField->sumInitialHeight : $drupalField->initialHeight;
 
 							if ($subWidget->PropertyInfo->Widgets) foreach ( $subWidget->PropertyInfo->Widgets as &$subSubWidget ) {
 								$subSubWidget->PropertyUsage = new PropertyUsage();
@@ -630,7 +628,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 								$subSubWidget->PropertyUsage->Mandatory       = (in_array($subSubWidget->PropertyInfo->Name , $mandatoryProperties));
 								$subSubWidget->PropertyUsage->Restricted      = false;
 								$subSubWidget->PropertyUsage->RefreshOnChange = false;
-								$subSubWidget->PropertyUsage->InitialHeight   = $drupalField->getInitialHeight();
+								$subSubWidget->PropertyUsage->InitialHeight   = $drupalField->initialHeight;
 							}
 						}
 
@@ -648,9 +646,9 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 		$dialog->MetaData = $this->extractMetaDataFromWidgets( $extraMetaData, $widgets );
 
 		// Get the publish properties and set them on the dialog.
-		if (is_array($fields) && isset($fields['publish_properties'])) {
+		if (is_array($fields) && isset($fields['basic_fields'])) {
 			$drupalField = new DrupalField();
-			$propertyInfos = $drupalField->getSpecialPropertyInfos($basicMD->ID, $fields['publish_properties'],
+			$propertyInfos = $drupalField->getSpecialPropertyInfos($basicMD->ID, $fields['basic_fields'],
 				$pubChannelId, $contentType );
 
 			// Collect anyway regardless of have errors and warnings or not
@@ -680,7 +678,7 @@ class Drupal8_PubPublishing extends PubPublishing_EnterpriseConnector
 	/**
 	 * Composes a Dialog->MetaData list from dialog widgets and custom properties.
 	 *
-	 * @oaram array $extraMetaDatas List of ExtraMetaData elements.
+	 * @param array $extraMetaDatas List of ExtraMetaData elements.
 	 * @param array $widgets List of DialogWidget elements.
 	 * @return array List of MetaDataValue elements.
 	 */

@@ -1,6 +1,6 @@
 <?php
 /**
- * "Publish to Drupal 7 - Publish Forms" TestCase class that belongs to the TestSuite of wwtest.
+ * "Publish to Drupal 8 - Publish Forms" TestCase class that belongs to the TestSuite of wwtest.
  * This class is automatically read and run by TestSuiteFactory class.
  * See TestSuiteInterfaces.php for more details about the TestSuite concept.
  *
@@ -14,8 +14,8 @@ require_once BASEDIR . '/server/wwtest/testsuite/TestSuiteInterfaces.php';
 
 class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 {
-	public function getDisplayName() { return 'Drupal 7 - Publish Forms'; }
-	public function getTestGoals()   { return 'Checks if the "Publish to Drupal 7 - Publish Forms" server plug-in is correctly configured. '; }
+	public function getDisplayName() { return 'Drupal 8 - Publish Forms'; }
+	public function getTestGoals()   { return 'Checks if the "Publish to Drupal 8 - Publish Forms" server plug-in is correctly configured. '; }
 	public function getTestMethods() { return ''; }
 	public function getPrio()        { return 23; }
 
@@ -26,14 +26,14 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 		require_once BASEDIR.'/server/dbclasses/DBConfig.class.php';
 
 		require_once BASEDIR.'/server/dbclasses/DBChannel.class.php';
-		$drupalChannelInfos = DBChannel::getChannelsByPublishSystem( WW_Plugins_Drupal8_Utils::Drupal8_PLUGIN_NAME );
+		$drupalChannelInfos = DBChannel::getChannelsByPublishSystem( WW_Plugins_Drupal8_Utils::DRUPAL8_PLUGIN_NAME );
 
 		if (!$drupalChannelInfos) {
 			$pageUrl = SERVERURL_ROOT.INETROOT.'/server/admin/publications.php';
-			$help = 'Click <a href="'.$pageUrl.'" target="_blank">here</a> to configure a Brand for publishing to Drupal 7.';
+			$help = 'Click <a href="'.$pageUrl.'" target="_blank">here</a> to configure a Brand for publishing to Drupal 8.';
 
 			$this->setResult( 'ERROR',
-				'Could not find a Drupal 7 Publication Channel.', $help );
+				'Could not find a Drupal 8 Publication Channel.', $help );
 		} else {
 		    foreach ( $drupalChannelInfos as $channelInfo ) {
 			    $pubChannel = WW_Utils_PublishingUtils::getAdmChannelById($channelInfo->Id);
@@ -56,8 +56,8 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 				    $channelIsUpdated = DBConfig::getValue( $channelUpdated );
 
 				    if ( is_null( $channelIsUpdated ) ) {
-						$url = SERVERURL_ROOT.INETROOT.'/server/admin/webappindex.php?webappid=ImportDefinitions&plugintype=server&pluginname=Drupal8';
-					    $help = 'Please import the Publish Form Templates on the <a href="' . $url . '">Drupal 7 Maintenance page</a>.';
+						$url = SERVERURL_ROOT.INETROOT.'/server/admin/webappindex.php?webappid=ImportDefinitions&plugintype=config&pluginname=Drupal8';
+					    $help = 'Please import the Publish Form Templates on the <a href="' . $url . '">Drupal 8 Maintenance page</a>.';
 					    $this->setResult( 'ERROR', 'The Publish Form Templates stored in Enterprise Server do not match '
 					        . 'with the content types available on Drupal.', $help );
 				    }
@@ -77,11 +77,16 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 		$channelUrl = SERVERURL_ROOT.INETROOT.'/server/admin/editChannel.php?publid='.$publicationId.'&channelid='.$pubChannel->Id;
 		$help = 'Click <a href="'.$channelUrl.'" target="_blank">here</a> to resolve the problem.';
 
-		$url = WW_Utils_PublishingUtils::getAdmPropertyValue( $pubChannel, WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL );
-		if( empty($url) ) {
+		$selectedSite = WW_Utils_PublishingUtils::getAdmPropertyValue( $pubChannel, WW_Plugins_Drupal8_Utils::CHANNEL_SITE_URL );
+
+		if( empty($selectedSite) ) {
 			$this->setResult( 'ERROR',
 				'The "Site URL" option configured for channel "'.$pubChannel->Name.'" is not set.', $help );
 		} else {
+			// Resolve the Uri.
+			$configuration = WW_Plugins_Drupal8_Utils::resolveConfigurationSettings( $selectedSite );
+			$url = $configuration['url'];
+
 			// For Drupal we use the Zend Http Client, so we use its URI factory to validate.
 			try {
 				require_once 'Zend/Uri.php';
@@ -90,25 +95,26 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 				$e = $e;
 				$uri = null;
 			}
+
+			// Check if the site could be reached.
 			if( !$uri ) {
 				$this->setResult( 'ERROR',
 					'The "Web Site URL" option for Publication Channel "'.$pubChannel->Name.'" is not set.', $help );
-			} else if( substr( $uri, -1 ) != '/' ) {
+			} else if( substr( $uri, -1 ) != '/' ) { // Shouldn't happen but just to be safe. When you save the url in the channel admin page, it should automatically add / at the end of url.
 				$this->setResult( 'ERROR',
 					'The "Web Site URL" option for Publication Channel "'.$pubChannel->Name.'"" should end with a slash (/).', $help );
 			}
-		}
 
-		$consumerKey = WW_Utils_PublishingUtils::getAdmPropertyValue( $pubChannel, WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_KEY );
-		if( empty($consumerKey) ) {
-			$this->setResult( 'ERROR',
-				'The "Consumer Key" option for Publication Channel "'.$pubChannel->Name.'" is not set.', $help );
-		}
+			// Check that the username and password are not empty for the selected Drupal user.
+			if ( empty ( $configuration['username'] ) ) {
+				$this->setResult( 'ERROR',
+					'The "Username" option for Publication Channel "'.$pubChannel->Name.'"" may not be empty.', $help );
+			}
 
-		$consumerSecret = WW_Utils_PublishingUtils::getAdmPropertyValue( $pubChannel, WW_Plugins_Drupal8_Utils::CHANNEL_CONSUMER_SECRET );
-		if( empty($consumerSecret) ) {
-			$this->setResult( 'ERROR',
-				'The "Consumer Secret" option for Publication Channel "'.$pubChannel->Name.'" is not set.', $help );
+			if ( empty ( $configuration['password'] ) ) {
+				$this->setResult( 'ERROR',
+					'The "Pasword" option for Publication Channel "'.$pubChannel->Name.'"" may not be empty.', $help );
+			}
 		}
 	}
 
@@ -125,9 +131,8 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 		require_once dirname(__FILE__) . '/../../DrupalXmlRpcClient.class.php';
 
 		$channelUrl = SERVERURL_ROOT.INETROOT.'/server/admin/editChannel.php?publid='.$publicationId.'&channelid='.$pubChannel->Id;
-		$help = 'Click <a href="'.$channelUrl.'" target="_blank">here</a> to verify the configuration.';
+		$help = 'Check the settings in the config.php file.';
 
-		// check if the config works
 		try {
 			$errorMessage = '';
 			
@@ -144,6 +149,18 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 				}
 				$this->setResult( 'ERROR', $errorMessage, $help);
 			} else {
+				if ( count ( $result['Access']) ) {
+					if ( empty ( $errorMessage ) ) {
+						$errorMessage .= $header;
+					}
+
+					foreach ( $result['Access'] as $access ) {
+						$errorMessage .= $access . "<br />\n";
+					}
+
+					$this->setResult( 'ERROR', $errorMessage, $help);
+				}
+
 				if (count($result['Version'])){
 					if(empty($errorMessage)) {
 						$errorMessage .= $header;
