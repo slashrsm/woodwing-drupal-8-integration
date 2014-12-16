@@ -1,0 +1,6 @@
+ww_enterprise.upload:
+  path: '/ww_enterprise/upload'
+  defaults:
+    _controller: '\Drupal\ww_enterprise\Controller\UploadController::upload'
+  requirements:
+    _permission: 'access content'
