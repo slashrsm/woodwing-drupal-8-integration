@@ -504,6 +504,10 @@ function ww_enterprise_xmlrpc_testConfig( $enableTestMode=false )
 			throw new \Exception( 'Could not authenticate the user.' );
 		}
 
+		// Though technically no longer required since the plugin moved from a core plugin to a release plugin, it is
+		// handy to have the version number of the plugin in place, even though this information will not be used in
+		// Enterprise Server to validate plugin versions against the server version, it is still can be valuable infor-
+		// mation when debugging the plugin.
 		$module = \Drupal::moduleHandler()->getModule( 'ww_enterprise' );
 		/** @var \Drupal\Core\Extension\Extension $module */
 		$infoPathName = $module->getPathname(); // Retrieves the path where the info file(ww_enterprise.info.yml file) resides.

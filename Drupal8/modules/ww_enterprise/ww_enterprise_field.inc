@@ -50,7 +50,7 @@ function validateRequest( \Symfony\Component\HttpFoundation\Request $request )
  */
 function accessCheck( \Drupal\user\Entity\User $user, $action, &$message, $nodeType=null, $nodeTypelabel=null )
 {
-	$errorMessage = 'User is not allowed to perform the requested action. The user lacks the following permission(s):';
+	$errorMessage = 'The post could not be published because the user does not have the following permissions set:';
 
 	switch ( $action ) {
 		case 'saveNodeCreate' : // Initially creating a node.
@@ -67,32 +67,32 @@ function accessCheck( \Drupal\user\Entity\User $user, $action, &$message, $nodeT
 
 			// If the user cannot bypass, he needs to have the access content right (basic)
 			if ( !$user->hasPermission( 'access content' ) ) {
-				$errorMessage .= ' `View published content`';
+				$errorMessage .= ' \'View published content\'';
 				$permitted = false;
 			}
 
 			if ( $action == 'saveNodeUpdate' ) {
 				// ...and the edit permission for content.
 				if ( !$user->hasPermission( 'edit any ' . $nodeType . ' content' ) ) {
-					$errorMessage .= ' `' . $nodeTypelabel . ': Edit any content`';
+					$errorMessage .= ' \'' . $nodeTypelabel . ': Edit any content\'';
 					$permitted = false;
 				}
 			} elseif ( $action == 'removeNode' ) {
 				// ...and the delete permission for content.
 				if ( !$user->hasPermission( 'delete any ' . $nodeType . ' content' ) ) {
-					$errorMessage .= ' `' . $nodeTypelabel . ': Delete any content`';
+					$errorMessage .= ' \'' . $nodeTypelabel . ': Delete any content\'';
 					$permitted = false;
 				}
 			} else {
 				// ...and the create permission for new content.
 				if ( !$user->hasPermission( 'create ' . $nodeType . ' content' ) ) {
-					$errorMessage .= ' `' . $nodeTypelabel . ': Create new content`';
+					$errorMessage .= ' \'' . $nodeTypelabel . ': Create new content\'';
 					$permitted = false;
 				}
 			}
 
 			if ( !$permitted ) {
-				$errorMessage .= ' Alternatively, give the user the `Bypass content access control` permission.';
+				$errorMessage .= ' Alternatively give the user the \'Bypass content access control\' permission.';
 			} else {
 				return true;
 			}
@@ -115,7 +115,7 @@ function accessCheck( \Drupal\user\Entity\User $user, $action, &$message, $nodeT
 		case 'getVocabularyNames' : // Retrieve information from a vocabulary.
 			// Bypass node access always passes the validation on these items.
 			if ( !$user->hasPermission( 'administer taxonomy') ) {
-				$errorMessage .= ' `Administer vocabularies and terms`';
+				$errorMessage .= ' \'Administer vocabularies and terms\'';
 			} else {
 				return true;
 			}
@@ -143,12 +143,12 @@ function checkUserPermissions( \Drupal\user\Entity\User $user )
 	$permissions = array( 'errors' => array() );
 
 	if ( !$user->hasPermission( 'administer taxonomy' ) ) {
-		$permissions['errors'][] = 'User does not have the `Administer vocabularies and terms` permission.';
+		$permissions['errors'][] = 'The \'Administer vocabularies and terms\' permission is not set for the user.';
 	}
 
 	// Check if the user is allowed to view content.
 	if ( !$user->hasPermission( 'access content' ) ) {
-		$permissions['errors'][] = 'User does not have the `View published content` permission.';
+		$permissions['errors'][] = 'The \'View published content\' permission is not set for the user.';
 	}
 
 	if ( !$user->hasPermission( 'bypass node access' ) ) {
@@ -173,17 +173,17 @@ function checkUserPermissions( \Drupal\user\Entity\User $user )
 			} else {
 				// Check permissions to create a node of the nodetype.
 				if ( !$user->hasPermission( 'create ' . $id . ' content' ) ){
-					$permissions['errors'][] = 'User does not have the `' . $label . ': Create new content` permission.';
+					$permissions['errors'][] = 'The \'' . $label . ': Create new content\' permission is not set for the user.';
 				}
 
 				// Check permissions to update a node.
 				if ( !$user->hasPermission( 'edit any ' . $id . ' content' ) ){
-					$permissions['errors'][] = 'User does not have the `' . $label . ': Edit any content` permission.';
+					$permissions['errors'][] = 'The \'' . $label . ': Edit any content\' permission is not set for the user.';
 				}
 
 				// Check permissions to delete a node.
 				if ( !$user->hasPermission( 'delete any ' . $id . ' content' ) ){
-					$permissions['errors'][] = 'User does not have the `' . $label . ': Delete any content` permission.';
+					$permissions['errors'][] = 'The \'' . $label . ': Delete any content\' permission is not set for the user.';
 				}
 			}
 		}
@@ -458,8 +458,8 @@ function getEnterpriseNodeFields( $contentType )
 				$dateTimeType = $field->getSetting( 'datetime_type' );
 				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] );
 			}
-			if ( $nodeProperties['type'] == 'taxonomy_term_reference' && ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' || $nodeProperties['widget_type'] == 'options_select' ) ) {
 
+			if ( $nodeProperties['type'] == 'taxonomy_term_reference' && ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' || $nodeProperties['widget_type'] == 'options_select' ) ) {
 				$defaultValue = '';
 				$allowedValues = $field->getItemDefinition()->getSetting( 'allowed_values' );
 				$vid = $allowedValues[0]['vocabulary'];
@@ -471,15 +471,32 @@ function getEnterpriseNodeFields( $contentType )
 				$storedTermEntity = getWoodWingSuggestionEntity( $voc->uuid() );
 				$ww_term_entity = (!empty($storedTermEntity)) ? $storedTermEntity : null;
 
-				$tid = $nodeProperties['default_value'][0]['target_id'];
-				if ( !is_null( $tid ) ) {
-					$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ) );
-					/** @var \Drupal\taxonomy\Entity\Term $term */
-					$term = $terms[$tid];
-					$defaultValue = $term->getName();
-				}
-
-				if ( $nodeProperties['widget_type'] == 'options_select' ) {
+				if ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' ) {
+					if ( $nodeProperties['cardinality'] == 1 ) {
+						$tid = $nodeProperties['default_value'][0]['target_id'];
+						if ( !is_null( $tid ) ) { // option -none-
+							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ) );
+							/** @var \Drupal\taxonomy\Entity\Term $term */
+							$term = $terms[$tid];
+							$defaultValue = $term->getName();
+						}
+					} else {
+						$totalDefaultValues = count( $nodeProperties['default_value'] );
+						$defaultValues = array();
+						for( $ctr=0; $ctr < $totalDefaultValues; $ctr++ ) {
+							$tid = $nodeProperties['default_value'][$ctr]['target_id'];
+							if( is_null( $tid ) ) {
+								continue; // Don't add the option '- None -' as default when there is more than one default.
+							}
+							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ));
+							$term = $terms[$tid];
+							$defaultValues[] = $term->getName();
+						}
+						if( $defaultValues ) {
+							$defaultValue = implode( ',', $defaultValues );
+						}
+					}
+				} elseif ( $nodeProperties['widget_type'] == 'options_select' ) {
 					$tree = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->loadTree( $vid, 0, NULL, TRUE );
 					$listOptionsValues = array();
 					if ( $tree ) foreach ( $tree as $term ) {
@@ -859,6 +876,12 @@ function validateFieldDefinition( $fieldDefinition, $type )
 				}
 				break;
 			case 'taxonomy_term_reference' :
+				if ( $fieldDefinition['widget_type'] == 'taxonomy_autocomplete' && $fieldDefinition['cardinality'] != -1 ) {
+					$errors[] = createError( $fieldName ,
+						'Cardinality has to be unlimited for fields of type "'.$fieldDefinition['type'].'" with widget "' . $fieldDefinition['widget_type'] . '".  Encountered '
+						. 'cardinality: \'' . $fieldDefinition['cardinality'] . '\'. ' . $requiredFieldMessage,
+						$contentType, $severity );
+				}
 				break;
 			default : // Invalid so do nothing.
 				$errors[] = createError( $fieldName, 'Unsupported Field and Field type combination for: Type: \''

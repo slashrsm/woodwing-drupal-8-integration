@@ -44,7 +44,7 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 				    LogHandler::Log( 'Drupal8Publish', 'INFO', 'Checked the channel options.' );
 			    }
 
-			    // Step 2: Check if we can login to Drupal and if the versions are compatible.
+			    // Step 2: Check if we can login to Drupal.
 			    if( !$this->hasError() ) {
 				    $this->validateDrupalConnection( $channelInfo->PublicationId, $pubChannel );
 				    LogHandler::Log( 'Drupal8Publish', 'INFO', 'Validated the Drupal connection.' );
@@ -81,7 +81,7 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 
 		if( empty($selectedSite) ) {
 			$this->setResult( 'ERROR',
-				'The "Site URL" option configured for channel "'.$pubChannel->Name.'" is not set.', $help );
+				'The \'Site URL\' option is not set for Publication Channel \''.$pubChannel->Name.'\'.', $help );
 		} else {
 			// Resolve the Uri.
 			$configuration = WW_Plugins_Drupal8_Utils::resolveConfigurationSettings( $selectedSite );
@@ -99,21 +99,21 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 			// Check if the site could be reached.
 			if( !$uri ) {
 				$this->setResult( 'ERROR',
-					'The "Web Site URL" option for Publication Channel "'.$pubChannel->Name.'" is not set.', $help );
+					'The \'Web Site URL\' option is not set for Publication Channel \''.$pubChannel->Name.'\'.', $help );
 			} else if( substr( $uri, -1 ) != '/' ) { // Shouldn't happen but just to be safe. When you save the url in the channel admin page, it should automatically add / at the end of url.
 				$this->setResult( 'ERROR',
-					'The "Web Site URL" option for Publication Channel "'.$pubChannel->Name.'"" should end with a slash (/).', $help );
+					'The \'Web Site URL\' option for Publication Channel \''.$pubChannel->Name.'\' should end with a slash (/).', $help );
 			}
 
 			// Check that the username and password are not empty for the selected Drupal user.
 			if ( empty ( $configuration['username'] ) ) {
 				$this->setResult( 'ERROR',
-					'The "Username" option for Publication Channel "'.$pubChannel->Name.'"" may not be empty.', $help );
+					'The \'Username\' option for Publication Channel \''.$pubChannel->Name.'\' may not be empty.', $help );
 			}
 
 			if ( empty ( $configuration['password'] ) ) {
 				$this->setResult( 'ERROR',
-					'The "Pasword" option for Publication Channel "'.$pubChannel->Name.'"" may not be empty.', $help );
+					'The \'Pasword\' option for Publication Channel \''.$pubChannel->Name.'\' may not be empty.', $help );
 			}
 		}
 	}
@@ -159,19 +159,6 @@ class WW_TestSuite_HealthCheck2_Drupal8Publish_TestCase extends TestCase
 					}
 
 					$this->setResult( 'ERROR', $errorMessage, $help);
-				}
-
-				if (count($result['Version'])){
-					if(empty($errorMessage)) {
-						$errorMessage .= $header;
-					}
-					foreach ($result['Version'] as $error){
-						$errorMessage .= $error . "<br />\n";
-					}
-					$this->setResult( 'ERROR', $errorMessage,
-						'Reinstall the ww_enterprise module in Drupal '.
-						'by using the version shipped with this version of Enterprise Server. ' .
-						'In Drupal, make sure that the module is re-loaded on the Modules page.');
 				}
 			}
 		} catch (Exception $e) {

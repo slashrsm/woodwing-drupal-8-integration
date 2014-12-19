@@ -21,7 +21,7 @@ class Drupal8_EnterprisePlugin extends EnterprisePlugin
 	{ 
 		$info = new PluginInfoData(); 
 		$info->DisplayName = 'Drupal 8 Beta';
-		$info->Version     = '9.4.0 Build 84'; // don't use PRODUCTVERSION.
+		$info->Version     = '9.5.0 Build 123'; // don't use PRODUCTVERSION.
 		$info->Description = 'Publishing service for Drupal 8 Beta.';
 		$info->Copyright   = COPYRIGHT_WOODWING;
 		return $info;
