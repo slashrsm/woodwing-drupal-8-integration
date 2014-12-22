@@ -686,7 +686,7 @@ class DrupalField {
 	 *
 	 * - The content type's sticky setting.
 	 * - The content type's promote setting.
-	 * - The content type's title setting.
+	 * - The content type's title setting. ( Can be hidden in the Drupal 8 Content Type )
 	 * - The content type's status setting.
 	 *
 	 * @static
@@ -706,12 +706,15 @@ class DrupalField {
 		$properties = array();
 		$namePrefix = 'C_DPF_' . $templateId;
 		$pattern = "/^C_DPF_[0-9]+_[A-Z0-9_]{0,}$/";
-		$basicProperties = array(
-			'title' => substr($namePrefix . '_TITLE', 0, 30),
-		    'promote' => substr($namePrefix . '_PROMOTE', 0, 30),
-		    'sticky' => substr($namePrefix . '_STICKY', 0, 30),
-		    'status' => substr($namePrefix . '_PUBLISH', 0, 30)
-		);
+
+		$basicProperties = array();
+		// Omit the title field if it was not sent along from Drupal 8 (Set to disabled on the Content Type).
+		if (isset( $rawSpecialFieldValues['title'])) {
+			$basicProperties['title'] = substr($namePrefix . '_TITLE', 0, 30);
+		}
+		$basicProperties['promote'] = substr($namePrefix . '_PROMOTE', 0, 30);
+		$basicProperties['sticky'] = substr($namePrefix . '_STICKY', 0, 30);
+		$basicProperties['status'] = substr($namePrefix . '_PUBLISH', 0, 30);
 
 		foreach ($basicProperties as $prop => $propertyName) {
 			$requiredFieldMsg = ( $rawSpecialFieldValues[$prop]['required'] ) ? self::DRUPAL_REQUIRED_FIELD_ERROR : '';
