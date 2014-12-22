@@ -340,7 +340,7 @@ function initializeDataDefinition( $nodeType )
  *
  * @param string $contentType The content type for which to retrieve field information.
  * @return array An array of basic and custom fields for the content type.
- *  * @throws Exception throws an exception if node field information cannot be retrieved.
+ * @throws Exception throws an exception if node field information cannot be retrieved.
  */
 function getEnterpriseNodeFields( $contentType )
 {
@@ -355,6 +355,12 @@ function getEnterpriseNodeFields( $contentType )
 	if ( $fields ) foreach ( $fields as $key => $field ) {
 		// Basic Fields are of the FieldDefinition type.
 		if ( $field instanceof Drupal\Core\Field\BaseFieldDefinition || $field instanceof Drupal\Core\Field\Entity\BaseFieldOverride ) {
+
+			// Title field can be hidden, therefore if it does not have a formComponent, do not add it to Enterprise Server.
+			if ( $key == 'title' && !array_key_exists($key, $formComponents )) {
+				continue;
+			}
+
 			$nodeProperties = initializeDataDefinition( $contentType );
 
 			switch ( $key ) {
@@ -1061,12 +1067,6 @@ function resolveInlineImages( $content, $attachments )
  */
 function mapNodeValues( $node, $formValues, $previewMode )
 {
-	// Set basic properties.
-	$node->title = $formValues['C_DIALOG_DRUPAL8_TITLE'][0];
-	$node->sticky = intval($formValues['C_DIALOG_DRUPAL8_STICKY'][0]);
-	$node->promote = intval($formValues['C_DIALOG_DRUPAL8_PROMOTE'][0]);
-	$node->status = ( $previewMode ) ? 0 : $formValues['C_DIALOG_DRUPAL8_PUBLISH'][0];
-
 	// Get the custom fields and set them on the node.
 	$basicProperties = array(
 		'C_DIALOG_DRUPAL8_TITLE',
@@ -1074,6 +1074,16 @@ function mapNodeValues( $node, $formValues, $previewMode )
 		'C_DIALOG_DRUPAL8_PROMOTE',
 		'C_DIALOG_DRUPAL8_PUBLISH'
 	);
+
+	// Set basic properties.
+	if ( array_key_exists( 'C_DIALOG_DRUPAL8_TITLE', $formValues )) {
+		$node->title = $formValues['C_DIALOG_DRUPAL8_TITLE'][0];
+	} else {
+		unset( $basicProperties['C_DIALOG_DRUPAL8_TITLE'] );
+	}
+	$node->sticky = intval($formValues['C_DIALOG_DRUPAL8_STICKY'][0]);
+	$node->promote = intval($formValues['C_DIALOG_DRUPAL8_PROMOTE'][0]);
+	$node->status = ( $previewMode ) ? 0 : $formValues['C_DIALOG_DRUPAL8_PUBLISH'][0];
 
 	if( $formValues ) foreach ( $formValues as $key => $values ) {
 		if ( !in_array( $key, $basicProperties ) ) {
