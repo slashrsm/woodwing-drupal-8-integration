@@ -162,8 +162,8 @@ function checkUserPermissions( \Drupal\user\Entity\User $user )
 			// If users have all or none of the permissions for a content type then the user is presumed to be
 			// configured correctly
 			if ( ( $user->hasPermission( 'create ' . $id . ' content' ) &&
-				$user->hasPermission( 'edit any ' . $id . ' content' ) &&
-				$user->hasPermission( 'delete any ' . $id . ' content' ) )
+					$user->hasPermission( 'edit any ' . $id . ' content' ) &&
+					$user->hasPermission( 'delete any ' . $id . ' content' ) )
 				||
 				( !$user->hasPermission( 'create ' . $id . ' content' ) &&
 					!$user->hasPermission( 'edit any ' . $id . ' content' ) &&
@@ -465,7 +465,7 @@ function getEnterpriseNodeFields( $contentType )
 				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] );
 			}
 
-			if ( $nodeProperties['type'] == 'taxonomy_term_reference' && ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' || $nodeProperties['widget_type'] == 'options_select' ) ) {
+			if ( $nodeProperties['type'] == 'taxonomy_term_reference' && ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' || $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons') ) {
 				$defaultValue = '';
 				$allowedValues = $field->getItemDefinition()->getSetting( 'allowed_values' );
 				$vid = $allowedValues[0]['vocabulary'];
@@ -502,7 +502,7 @@ function getEnterpriseNodeFields( $contentType )
 							$defaultValue = implode( ',', $defaultValues );
 						}
 					}
-				} elseif ( $nodeProperties['widget_type'] == 'options_select' ) {
+				} elseif ( $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons' ) {
 					$tree = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->loadTree( $vid, 0, NULL, TRUE );
 					$listOptionsValues = array();
 					if ( $tree ) foreach ( $tree as $term ) {
@@ -571,10 +571,10 @@ function getEnterpriseNodeFields( $contentType )
 					}
 				}
 			} elseif( ( $nodeProperties['widget_type'] == 'string_textfield' || // text (plain)
-					   $nodeProperties['widget_type'] == 'string_textarea'  || // text (plain, long)
-					   $nodeProperties['widget_type'] == 'text_textarea'    || // text (formatted, long)
-					   $nodeProperties['widget_type'] == 'text_textarea_with_summary' // text (formatted, long, summary)
-					)
+				$nodeProperties['widget_type'] == 'string_textarea'  || // text (plain, long)
+				$nodeProperties['widget_type'] == 'text_textarea'    || // text (formatted, long)
+				$nodeProperties['widget_type'] == 'text_textarea_with_summary' // text (formatted, long, summary)
+			)
 			) {
 				$nodeProperties['max_length'] = $field->getSetting( 'max_length' );
 				$nodeProperties['default_value'] = $nodeProperties['default_value'][0]['value'];
@@ -798,7 +798,7 @@ function validateFieldDefinition( $fieldDefinition, $type )
 				// None of the cases matched, generate an error.
 				$errors[] = createError( $fieldName, 'The cardinality is invalid; ' . $fieldDefinition['cardinality'] .
 					' is not valid for Fields of type ' . $fieldDefinition['widget_type']. '. ' .$requiredFieldMessage,
-					 $contentType, $severity );
+					$contentType, $severity );
 				break;
 			case 'decimal' : // Field Type Double.
 			case 'float' : // Field type Float.
@@ -812,14 +812,14 @@ function validateFieldDefinition( $fieldDefinition, $type )
 				}
 				$errors[] = createError( $fieldName, 'The cardinality is invalid; ' . $fieldDefinition['cardinality'] .
 					' is not valid for Fields of type ' . $fieldDefinition['widget_type']. '. ' .$requiredFieldMessage,
-					 $contentType, $severity );
+					$contentType, $severity );
 				break;
 			case 'datetime': // Field Type date time
 				// Business Rule: Cardinality has to be 1 for a date time
 				if ( $fieldDefinition['cardinality'] != 1 ) {
 					$errors[] = createError( $fieldName, 'The cardinality is invalid; ' . $fieldDefinition['cardinality'] .
 						' is not valid for Fields of type ' . $fieldDefinition['widget_type']. '. ' .$requiredFieldMessage,
-						 $contentType, $severity );
+						$contentType, $severity );
 				}
 				if( $fieldDefinition['default_value'] ) {
 					$errors[] = createError( $fieldName, 'The default value is not supported; ' . $fieldDefinition['default_value'] .
@@ -892,7 +892,7 @@ function validateFieldDefinition( $fieldDefinition, $type )
 			default : // Invalid so do nothing.
 				$errors[] = createError( $fieldName, 'Unsupported Field and Field type combination for: Type: \''
 					. $fieldDefinition['type'] . '\', Field: \'' . $fieldDefinition['widget_type'] . '\'. '  . $requiredFieldMessage,
-					 $contentType, $severity );
+					$contentType, $severity );
 				break;
 		}
 	}
