@@ -228,6 +228,7 @@ class DrupalField {
 		$rawField = $drupalField->rawField;
 
 		switch ($drupalField->getWidgetType()) {
+			case 'options_buttons':
 			case 'options_select':
 				$values = $rawField['list_options'];
 				break;
