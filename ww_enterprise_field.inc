@@ -469,9 +469,8 @@ function getEnterpriseNodeFields( $contentType )
 				$defaultValue = '';
 				$allowedValues = $field->getItemDefinition()->getSetting( 'allowed_values' );
 				$vid = $allowedValues[0]['vocabulary'];
-				$vocs = \Drupal\taxonomy\Entity\Vocabulary::loadMultiple( array ( $vid ) );
-				$voc = $vocs[$vid];
-				$vocabulary = $voc->name;
+				$voc = \Drupal\taxonomy\Entity\Vocabulary::load( $vid );
+				$vocabulary = $voc->label();
 
 				/** @var \Drupal\taxonomy\Entity\Vocabulary $voc */
 				$storedTermEntity = getWoodWingSuggestionEntity( $voc->uuid() );

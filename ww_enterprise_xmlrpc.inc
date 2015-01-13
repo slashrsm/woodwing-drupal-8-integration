@@ -216,8 +216,8 @@ function ww_enterprise_xmlrpc_getVocabularyNames( $params, $testmode=false )
 			/** @var Drupal\taxonomy\Entity\Vocabulary $vocabulary */
 			$result[$vocabulary->uuid()] = array(
 				'uuid' => $vocabulary->uuid(),
-				'vid' => $vocabulary->vid,
-				'name' => $vocabulary->name,
+				'vid' => $vocabulary->id(),
+				'name' => $vocabulary->label(),
 				'ww_term_entity' => getWoodWingSuggestionEntity($vocabulary->uuid())
 			);
 		}
