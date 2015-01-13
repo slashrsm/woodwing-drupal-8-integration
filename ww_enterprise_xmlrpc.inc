@@ -116,7 +116,7 @@ function ww_enterprise_xmlrpc_getContentTypes( $enableTestMode=false )
 			throw new \Exception( 'Could not authenticate the user.' );
 		}
 
-		checkFilters(); // Check the full_html filter.
+		checkFilters(); // Check the default filter format.
 
 		// Load all node types.
 		$types = \Drupal\node\Entity\NodeType::loadMultiple();

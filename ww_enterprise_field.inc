@@ -1,4 +1,5 @@
 <?php
+use Drupal\filter\Entity\FilterFormat;
 
 /**
  * Validates a request using the Drupal authentication manager.
@@ -1011,12 +1012,12 @@ function deleteExpiredPreviews()
  */
 function checkFilters()
 {
-	// Determine if there is a filter for 'full_html', that it is enabled, and that it is for HTML.
-	/** @var \Drupal\filter\FilterFormatInterface $filter */
-	$filter = entity_load( 'filter_format', 'full_html' );
+	// Determine if there is a default filter, that it is enabled, and that it is for HTML.
+	$default_filter_format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
+	$filter = FilterFormat::load( $default_filter_format );
 
 	if ( !$filter || !$filter->status() ){
-		throw new \Exception( 'The mandatory Drupal text format "full_html" is either missing or disabled. Please ' .
+		throw new \Exception( 'The mandatory Drupal text format "' . $default_filter_format . '" (set by ww_enterprise.settings:default_filter_format) is either missing or disabled. Please ' .
 			'ensure that the format exists and is not disabled.' );
 	}
 }
@@ -1144,7 +1145,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						$attachments = ( isset( $values[0]['attachments'] ) ) ? $values[0]['attachments'] : null;
 						$val = resolveInlineImages( $content, $attachments );
 						$node->$field_machine_name->value = $val;
-						$node->$field_machine_name->format = 'full_html';
+						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
 					case 'text_with_summary': // text (formatted, long, summary)
 						$content = null;
@@ -1170,7 +1171,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						$summaryContent = resolveInlineImages( $content, $attachments );
 						$node->$field_machine_name->summary = $summaryContent;
 
-						$node->$field_machine_name->format = 'full_html';
+						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
 					case 'taxonomy_term_reference': //
 						$termIds = array();
