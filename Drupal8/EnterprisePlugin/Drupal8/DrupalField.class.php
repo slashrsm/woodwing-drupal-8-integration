@@ -230,6 +230,7 @@ class DrupalField {
 		switch ($drupalField->getWidgetType()) {
 			case 'options_buttons':
 			case 'options_select':
+			case 'comment_default':
 				$values = $rawField['list_options'];
 				break;
 			default :
