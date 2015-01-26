@@ -116,7 +116,7 @@ function ww_enterprise_xmlrpc_getContentTypes( $enableTestMode=false )
 			throw new \Exception( 'Could not authenticate the user.' );
 		}
 
-		checkFilters(); // Check the full_html filter.
+		checkFilters(); // Check the default filter format.
 
 		// Load all node types.
 		$types = \Drupal\node\Entity\NodeType::loadMultiple();
@@ -216,8 +216,8 @@ function ww_enterprise_xmlrpc_getVocabularyNames( $params, $testmode=false )
 			/** @var Drupal\taxonomy\Entity\Vocabulary $vocabulary */
 			$result[$vocabulary->uuid()] = array(
 				'uuid' => $vocabulary->uuid(),
-				'vid' => $vocabulary->vid,
-				'name' => $vocabulary->name,
+				'vid' => $vocabulary->id(),
+				'name' => $vocabulary->label(),
 				'ww_term_entity' => getWoodWingSuggestionEntity($vocabulary->uuid())
 			);
 		}
@@ -351,6 +351,15 @@ function ww_enterprise_xmlrpc_saveNode( $dossierProps, $formValues, $attachments
 				throw new \Exception( $message );
 			}
 
+			// For publishing we try to find the username that is publishing from Enterprise. This will try to get the
+			// user from the database, if not found the user defined in the plugin's config.php file will be used.
+			if ( isset($dossierProps['Username']) && $dossierProps['Username'] ) {
+				$user = user_load_by_name( trim($dossierProps['Username']) );
+				if ( $user instanceof \Drupal\user\Entity\User ) {
+					$uid = $user->id();
+				}
+			}
+
 			$node = Drupal\node\Entity\Node::create( array( 'type' => $originalType ) );
 		} elseif ( $dossierProps['Action'] == 'Update' ) {
 			// Verify that we have a Node ID for the node to be updated.
@@ -370,7 +379,6 @@ function ww_enterprise_xmlrpc_saveNode( $dossierProps, $formValues, $attachments
 			$node = $node[$dossierProps['ExternalId']];
 			// When updating we preserve the original author.
 			$uid = $node->uid;
-
 		}
 
 		// Map all the other fields for this call.
@@ -491,8 +499,8 @@ function ww_enterprise_xmlrpc_testConfig( $enableTestMode=false )
 
 	// Automatically reload the ww_enterprise module for Drupal to ensure we always have the most recent
 	// information cached in case the module changed.
-	\Drupal::moduleHandler()->uninstall( array( 'ww_enterprise' ) );
-	\Drupal::moduleHandler()->install( array( 'ww_enterprise' ), false );
+	\Drupal::service('module_installer')->uninstall( array( 'ww_enterprise' ), FALSE);
+	\Drupal::service('module_installer')->install( array( 'ww_enterprise' ), FALSE);
 
 	try {
 		checkFilters();
