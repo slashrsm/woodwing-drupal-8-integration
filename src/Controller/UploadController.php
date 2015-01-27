@@ -35,23 +35,45 @@ class UploadController extends ControllerBase
 	 * - Files are stored in the database and entered in the file_managed table.
 	 * - Files are made permanent to prevent deletion by Drupal at intervals.
 	 *
+	 * Authentication is handled by means of options in the ww_enterprise_routing.yml file, where an authentication
+	 * option is set. The user supplied in the authentication is used to set the uploaded file's user id.
+	 *
 	 * The resulting xml response is printed to the screen and is used by Enterprise Server to retrieve
 	 * the file id's.
 	 */
 	public function upload()
 	{
-		// Authenticate the request.
-		/** @var \Drupal\user\Entity\User $user */
-		$user = validateRequest( \Drupal::request() );
-		if ( is_null( $user ) ) {
-			\Drupal::logger( 'ww_enterprise' )->debug( 'Could not authenticate the user.' );
-			throw new \Exception( 'Could not authenticate the user.' );
-		}
-
 		$dom = new \DOMDocument( '1.0', 'UTF-8' );
 		$uploadResponseElement = $dom->createElement( 'UploadResponse' );
 		try {
-			$uid = $user->id();
+			// Attempt to use the Enterprise Server user as the uploading user.
+			$username = trim($_GET['ww_username']);
+			$uid = null;
+			if ( !empty( $username ) ) {
+				//  Load the user.
+				$user = user_load_by_name( $username );
+				if ( $user instanceof \Drupal\user\Entity\User ) {
+					$uid = $user->id();
+				}
+			}
+
+			// Check if we have loaded the enterprise user, otherwise use the authentication user.
+			if ( is_null( $uid ) ) {
+				$username = \Drupal::request()->getUser();
+				if ( is_null( $username ) ) {
+					throw new \Exception('Username not supplied in the authentication request.');
+				}
+
+				$user = user_load_by_name( $username );
+				if ( $user instanceof \Drupal\user\Entity\User ) {
+					$uid = $user->id();
+				}
+			}
+
+			// Check if we have a uid, otherwise throw an exception
+			if ( is_null( $uid ) ) {
+				throw new \Exception('Could not determine the user id for the upload.');
+			}
 
 			// Find the ContentType for the passed GUID.
 			$originalUuid = $_GET['content_type'];

@@ -4,3 +4,5 @@ ww_enterprise.upload:
     _controller: '\Drupal\ww_enterprise\Controller\UploadController::upload'
   requirements:
     _permission: 'access content'
+  options:
+    _auth: ['basic_auth']
