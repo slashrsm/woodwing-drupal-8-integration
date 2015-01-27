@@ -34,6 +34,11 @@ class UploadController extends ControllerBase
 	 * - Reads out the fields uri scheme and uses this when storing the files.
 	 * - Files are stored in the database and entered in the file_managed table.
 	 * - Files are made permanent to prevent deletion by Drupal at intervals.
+	 * - Limited support for tokenized file paths is offered.
+	 *
+	 * Tokens are translated through Drupal's token service, only tokens that do not rely on additional data are
+	 * supported. An additional check is done to see if there are any tokens left after the translation in which case
+	 * an error is given.
 	 *
 	 * Authentication is handled by means of options in the ww_enterprise_routing.yml file, where an authentication
 	 * option is set. The user supplied in the authentication is used to set the uploaded file's user id.
@@ -141,6 +146,15 @@ class UploadController extends ControllerBase
 
 			$validators['file_validate_extensions'] = $filters;
 			$path = $scheme . $subDirectory;
+
+			// Handle tokens:
+			$token_service = \Drupal::token();
+			$path = $token_service->replace($path, array());
+
+			// Check if all the tokens were replaced.
+			if (preg_match( '/\[/', $path) == true) {
+				throw new \Exception( 'Upload failed, unresolvable token found in file path.' );
+			}
 
 			if ( !is_dir( $path ) ) {
 				drupal_mkdir( $path, null, true );
