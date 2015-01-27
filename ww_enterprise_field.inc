@@ -746,7 +746,7 @@ function getEnterpriseNodeFields( $contentType )
  *
  * @param array $fieldDefinition The definition to be validated.
  * @param string $type The type of the field to be validated.
- * @param string $warnOnly Whether or not the errors should block the import of this field.
+ * @param bool $warnOnly Whether or not the errors should block the import of this field.
  * @return array List of found errors.
  */
 function validateFieldDefinition( &$fieldDefinition, $type, &$warnOnly=false )
