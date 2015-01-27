@@ -546,6 +546,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 		try {
 			// Now it's time to upload the file to Drupal ...
 			require_once 'Zend/Http/Client.php';
+			require_once BASEDIR.'/server/bizclasses/BizSession.class.php';
 			$client = $this->createHttpClient( $this->url.'ww_enterprise/upload', $this->certificate);
 			$client->setHeaders('Authorization', $this->authentication );
 			// We need to send them as GET parameters, because Zend is including them in the signature when the enctype is set to
@@ -553,6 +554,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 			$client->setParameterGet( 'q', 'ww_enterprise/upload');
 			$client->setParameterGet( 'content_type', $contentType);
 			$client->setParameterGet( 'field_id', $drupalFieldId );
+			$client->setParameterGet( 'ww_username', BizSession::getShortUserName() );
 
 			$client->setFileUpload( $fileName, 'files[upload]', $content, $attachment->Type );
 
