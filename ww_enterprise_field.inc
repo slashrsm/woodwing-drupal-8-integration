@@ -441,7 +441,35 @@ function getEnterpriseNodeFields( $contentType )
 			$nodeProperties = initializeDataDefinition( $contentType );
 			$nodeProperties['name'] = $field->getName();
 			$nodeProperties['type'] = $field->getType();
-			$nodeProperties['widget_type'] = $formComponents[$key]['type'];
+			$nodeProperties['widget_type'] = ( isset( $formComponents[$key]['type'] ) )
+				? $formComponents[$key]['type'] :
+				'';
+
+			// If the widget type is not known we will want to get the default widget type for the field to see
+			// if that can be mapped to a known type. If that fails as well the field cannot be imported by default.
+			$knownWidgets = array(
+				'boolean_checkbox',
+				'datetime_default',
+				'comment_default',
+				'taxonomy_autocomplete',
+				'options_select',
+				'options_buttons',
+				'image_image',
+				'file_generic',
+				'string_textfield',
+				'string_textarea',
+				'text_textarea',
+				'text_textarea_with_summary',
+				'email_default',
+				'number',
+			);
+
+			if ( !in_array( $nodeProperties['widget_type'], $knownWidgets ) ) {
+				// Attempt to read out the default field type.
+				$defaultTypeInfo = \Drupal::service('plugin.manager.field.field_type')->getDefinition($nodeProperties['type']);
+				$nodeProperties['widget_type'] = $defaultTypeInfo['default_widget'];
+			}
+
 			$nodeProperties['has_text_filter'] = false;
 			// Only fields of type text, text_long and text_with_summary have text_processing in place.
 			$formattedTextFieldTypes = array(
@@ -1280,7 +1308,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 							}
 
 							// Only add the description if the field is enabled.
-							if ( $node->$field_machine_name->getSetting( 'description_field' ) ) {
+							if ( $node->$field_machine_name->getSetting( 'description_field' ) && isset( $value['description'] ) ) {
 								$val['description'] = $value['description'];
 							}
 
