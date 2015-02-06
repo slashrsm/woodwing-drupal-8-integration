@@ -127,9 +127,9 @@ function ww_enterprise_xmlrpc_getContentTypes( $enableTestMode=false )
 			if ( accessCheck( $user, 'getContentTypes', $message, $type->id(), $type->label() ) ) {
 				// Transform the content type into something enterprise can use:
 				$contentTypeInformation[$type->getOriginalId()] = array(
-					'type' => $type->type,
-					'name' => $type->name,
-					'description' => strip_tags( $type->description ), // Strip out h tags.
+					'type' => $type->id(),
+					'name' => $type->label(),
+					'description' => strip_tags( $type->getDescription() ), // Strip out h tags.
 					'original' => $type->uuid()
 				);
 			}
