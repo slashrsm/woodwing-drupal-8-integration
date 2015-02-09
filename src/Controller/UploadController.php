@@ -88,7 +88,7 @@ class UploadController extends ControllerBase
 			/** @var \Drupal\node\Entity\NodeType $type */
 			if ( $types ) foreach ( $types as $type ) {
 				if ( $type->uuid() == $originalUuid ) {
-					$originalType = $type->type;
+					$originalType = $type->id();
 					$id = $type->id();
 					break;
 				}

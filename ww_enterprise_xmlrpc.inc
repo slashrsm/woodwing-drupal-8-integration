@@ -170,7 +170,7 @@ function ww_enterprise_xmlrpc_getFields( $enableTestMode=false )
 		if ( $types ) foreach ( $types as $type ) {
 			$message = '';
 			if ( accessCheck( $user, 'getFields', $message, $type->id(), $type->label() ) ) {
-				$nodeFields[$type->uuid()] = getEnterpriseNodeFields( $type->type );
+				$nodeFields[$type->uuid()] = getEnterpriseNodeFields( $type->id() );
 			}
 		}
 		$nodeFields['DrupalDatabaseInstanceId'] = getUniqueDrupalInstanceId();
@@ -331,7 +331,7 @@ function ww_enterprise_xmlrpc_saveNode( $dossierProps, $formValues, $attachments
 		/** @var \Drupal\node\Entity\NodeType $type */
 		foreach ( $types as $type ) {
 			if ( $type->uuid() == $originalUuid ) {
-				$originalType = $type->type;
+				$originalType = $type->id();
 				$id = $type->id();
 				$label = $type->label();
 				break; // Found.
