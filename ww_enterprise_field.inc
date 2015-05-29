@@ -1,5 +1,8 @@
 <?php
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\filter\Entity\FilterFormat;
+use Drupal\user\UserInterface;
 
 /**
  * Validates a request using the Drupal authentication manager.
@@ -12,18 +15,21 @@ use Drupal\filter\Entity\FilterFormat;
  */
 function validateRequest( \Symfony\Component\HttpFoundation\Request $request )
 {
-	// For some odd reason, the Drupal flood control already logs 5 failed attempts when we attempt to authenticate a
-	// single user. Five is also the default amount for the flood control setting to block further attempts. It can be
-	// that the Drupal core attempts multiple authentication providers and thus generates these logged attempts in the
-	// flood table. As a work around for now we set the maximum user attempts to 50 in the configuration.
-	$limit = \Drupal::config( 'user.flood' )->get( 'user_limit' );
-	if ($limit < 50 ) {
-		\Drupal::config('user.flood')
-			->set('user_limit', 50)
-			->save();
+
+	// Check if the current user is already authenticated, in that case, return
+	// that. This relies on a patched xmlrpc.routing.yml that enables basic_auth
+	// for the xmlrpc.php route.
+	$user = \Drupal::currentUser();
+	if ($user instanceof AccountProxyInterface) {
+		$user = $user->getAccount();
+	}
+	if ( $user->isAuthenticated() && $user instanceof UserInterface ) {
+		return $user;
 	}
 
 	// Authenticate anonymous users and those that have not yet been authenticated.
+	// @todo This module should not have to do this. It is not even clear how it
+	//   can work, without patching rest.module.
 	/** @var \Drupal\user\Entity\User $user */
 	$user = \Drupal::service( 'authentication' )->authenticate( $request );
 	$authenticated = ( $user instanceof \Drupal\user\Entity\User && $user->isAuthenticated() && !$user->isAnonymous() );

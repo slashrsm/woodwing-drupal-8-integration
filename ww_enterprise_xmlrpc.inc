@@ -127,9 +127,9 @@ function ww_enterprise_xmlrpc_getContentTypes( $enableTestMode=false )
 			if ( accessCheck( $user, 'getContentTypes', $message, $type->id(), $type->label() ) ) {
 				// Transform the content type into something enterprise can use:
 				$contentTypeInformation[$type->getOriginalId()] = array(
-					'type' => $type->type,
-					'name' => $type->name,
-					'description' => strip_tags( $type->description ), // Strip out h tags.
+					'type' => $type->id(),
+					'name' => $type->label(),
+					'description' => strip_tags( $type->getDescription() ), // Strip out h tags.
 					'original' => $type->uuid()
 				);
 			}
@@ -170,7 +170,7 @@ function ww_enterprise_xmlrpc_getFields( $enableTestMode=false )
 		if ( $types ) foreach ( $types as $type ) {
 			$message = '';
 			if ( accessCheck( $user, 'getFields', $message, $type->id(), $type->label() ) ) {
-				$nodeFields[$type->uuid()] = getEnterpriseNodeFields( $type->type );
+				$nodeFields[$type->uuid()] = getEnterpriseNodeFields( $type->id() );
 			}
 		}
 		$nodeFields['DrupalDatabaseInstanceId'] = getUniqueDrupalInstanceId();
@@ -331,7 +331,7 @@ function ww_enterprise_xmlrpc_saveNode( $dossierProps, $formValues, $attachments
 		/** @var \Drupal\node\Entity\NodeType $type */
 		foreach ( $types as $type ) {
 			if ( $type->uuid() == $originalUuid ) {
-				$originalType = $type->type;
+				$originalType = $type->id();
 				$id = $type->id();
 				$label = $type->label();
 				break; // Found.
