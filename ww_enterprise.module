@@ -112,6 +112,11 @@ function ww_enterprise_taxonomy_vocabulary_presave( Drupal\Core\Entity\EntityInt
 	$guid = $entity->uuid();
 	$suggestionEntity = \Drupal::request()->request->get( 'ww_term_entity' );
 
+	// Prevent an SQL injection if no suggestion entity is given.
+	if (!$suggestionEntity) {
+		return;
+	}
+
 	// Check if a value already exists for the ww_term_entity, if not add one, used for insert as well as update.
 	$storedEntity = getWoodWingSuggestionEntity( $guid );
 	if ( is_null( $storedEntity ) ) {
