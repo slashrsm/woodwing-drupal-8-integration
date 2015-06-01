@@ -18,9 +18,7 @@ function validateRequest( \Symfony\Component\HttpFoundation\Request $request )
 	// flood table. As a work around for now we set the maximum user attempts to 50 in the configuration.
 	$limit = \Drupal::config( 'user.flood' )->get( 'user_limit' );
 	if ($limit < 50 ) {
-		\Drupal::config('user.flood')
-			->set('user_limit', 50)
-			->save();
+		\Drupal::configFactory()->getEditable('user.flood')->set('user_limit', 50 )->save();
 	}
 
 	// Authenticate anonymous users and those that have not yet been authenticated.
@@ -781,7 +779,7 @@ function validateFieldDefinition( &$fieldDefinition, $type, &$warnOnly=false )
 {
 	$errors = array();
 	$severity = ( $fieldDefinition['required'] ) ? 'error' : 'warn';
-	$unsupportedFieldTypes = array(	'text' );
+	$unsupportedFieldTypes = array(	'text' ); //  text (formatted)
 
 	$requiredFieldMessage = ( $fieldDefinition['required'] ) ? '(This is a required field. However, it could not be imported.)' : '';
 
@@ -1207,6 +1205,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
 					case 'text_with_summary': // text (formatted, long, summary)
+						// Long text summary
 						$content = null;
 						if( isset( $values[0]['elements'] ) ) { // Happens when only 'body' is filled in.
 							$content = $values[0]['elements'];
