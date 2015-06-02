@@ -128,7 +128,7 @@ function ww_enterprise_xmlrpc_getContentTypes( $enableTestMode=false )
 				// Transform the content type into something enterprise can use:
 				$contentTypeInformation[$type->getOriginalId()] = array(
 					'type' => $type->id(),
-					'name' => $type->get('name'),
+					'name' => $type->label(),
 					'description' => strip_tags( $type->getDescription()), // Strip out h tags.
 					'original' => $type->uuid()
 				);
