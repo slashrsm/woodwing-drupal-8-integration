@@ -203,6 +203,10 @@ class DrupalField {
 		// TODO: Default values.
 		// TODO: Selectable values.
 
+		// Enterprise can only store one default value. If an array is passed just take the first entry.
+		if ( is_array( $field['default_value']) ) {
+			$field['default_value'] = isset($field['default_value'][0]['value']) ? strval($field['default_value'][0]['value']) : null;
+		}
 		$drupalField->defaultValues = isset( $field['default_value']) ? $field['default_value'] : null;
 
 		// Add or restructure additional information based on the type / widget type of the object.
@@ -271,7 +275,7 @@ class DrupalField {
 		$valid = true;
 		if ( $errors ) foreach ( $errors as $key => $errorList) {
 			if ($key == $this->machineName) {
-					$valid = false;
+				$valid = false;
 			}
 		}
 
@@ -416,7 +420,7 @@ class DrupalField {
 
 			// If Type is a FileSelector, also add the File.
 			if ( !is_null($propertyInfo) && isset($propertyInfoFile) && ($propertyInfo->Type == 'fileselector'
-				|| $propertyInfo->Type == 'articlecomponentselector')) {
+					|| $propertyInfo->Type == 'articlecomponentselector')) {
 
 				$flattenedProps['PublishForm'][] = $propertyInfoFile;
 
@@ -519,25 +523,25 @@ class DrupalField {
 		// Resolve subwidgets and properties for specific types of widgets.
 		if ( $this->type == 'image' ) {
 
-				// Check the Alt text field.
-				if ( $this->hasAltTextField ) {
-					$propertyInfos[] = $this->createPropertyInfoForAlternateTextSubWidget();
-				}
+			// Check the Alt text field.
+			if ( $this->hasAltTextField ) {
+				$propertyInfos[] = $this->createPropertyInfoForAlternateTextSubWidget();
+			}
 
-				// Check the Title field.
-				if ( $this->hasTitleField ) {
-					$propertyInfos[] = $this->createPropertyInfoForTitleSubWidget();
-				}
+			// Check the Title field.
+			if ( $this->hasTitleField ) {
+				$propertyInfos[] = $this->createPropertyInfoForTitleSubWidget();
+			}
 		} elseif ( $this->type == 'file' ) {
 
-				// Check the Display field.
-				if ( $this->hasDisplayField ) {
-					$propertyInfos[] = $this->createPropertyInfoForDisplaySubWidget( $this->displayDefault );
-				}
+			// Check the Display field.
+			if ( $this->hasDisplayField ) {
+				$propertyInfos[] = $this->createPropertyInfoForDisplaySubWidget( $this->displayDefault );
+			}
 
-				// Check the Description Field.
-				if ( $this->hasDescriptionField ) {
-					$propertyInfos[] = $this->createPropertyInfoForDescriptionSubWidget();
+			// Check the Description Field.
+			if ( $this->hasDescriptionField ) {
+				$propertyInfos[] = $this->createPropertyInfoForDescriptionSubWidget();
 			}
 		}
 
@@ -666,7 +670,7 @@ class DrupalField {
 
 		// Determine the new name.
 		$name = $stringPrefix . $this->templateId . '_' . $this->id . $subWidgetPrefix . '_' . $drupalFieldName;
-			$name = substr($name, 0, 30);
+		$name = substr($name, 0, 30);
 
 		// validate the Name.
 		if (!$this->validateCustomPropertyName( $name, $stringPrefix )) {
@@ -843,8 +847,8 @@ class DrupalField {
 	 * The PropertyValues are used for example with files / articlecomponents to specify the filter for the file
 	 * inputs.
 	 *
-     * @return null|PropertyValue[] The PropertyValues for this field.
-     */
+	 * @return null|PropertyValue[] The PropertyValues for this field.
+	 */
 	public function getPropertyValues()
 	{
 		return $this->propertyValues;
