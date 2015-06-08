@@ -497,11 +497,6 @@ function ww_enterprise_xmlrpc_testConfig( $enableTestMode=false )
 {
 	$result = null;
 
-	// Automatically reload the ww_enterprise module for Drupal to ensure we always have the most recent
-	// information cached in case the module changed.
-	\Drupal::service('module_installer')->uninstall( array( 'ww_enterprise' ), FALSE);
-	\Drupal::service('module_installer')->install( array( 'ww_enterprise' ), FALSE);
-
 	try {
 		checkFilters();
 
