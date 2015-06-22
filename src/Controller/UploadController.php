@@ -161,6 +161,10 @@ class UploadController extends ControllerBase
 			}
 			$files = file_save_upload( 'upload', $validators, $path, null, FILE_EXISTS_RENAME );
 			if ( empty ( $files ) ) {
+        $event = past_event_create('ww_enterprise', 'upload_failure', 'Failed to upload file');
+        $event->addArgumentArray('files', \Drupal::request()->files->all());
+        $event->addArgument('path', $path);
+        $event->save();
 				throw new \Exception( 'Upload failed.' );
 			}
 
