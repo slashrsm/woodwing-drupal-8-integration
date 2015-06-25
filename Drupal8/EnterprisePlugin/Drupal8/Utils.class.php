@@ -46,7 +46,7 @@ class WW_Plugins_Drupal8_Utils
 			'url' => '',
 			'username' => '',
 			'password' => '',
-		    'authentication' => '',
+			'authentication' => '',
 		);
 
 		if ($siteIndex != BizResources::localize( 'LIS_NONE')) {
@@ -89,7 +89,7 @@ class WW_Plugins_Drupal8_Utils
 	/**
 	 * Converts a given content type (of Drupal) into a DocumentID (of Enterprise).
 	 *
-     * @param int $siteId
+	 * @param int $siteId
 	 * @param string $contentType Drupal's content type.
 	 * @return string Enterprise's DocumentID.
 	 */
@@ -302,17 +302,24 @@ class WW_Plugins_Drupal8_Utils
 				// If we are dealing with a multilist or multistring, transform selected values back into an array.
 				if ( count($fields[$propertyInfo->Name]) == 1
 					&& ($propertyInfo->Type == 'multilist'
-                        || $propertyInfo->Type == 'multistring')
+						|| $propertyInfo->Type == 'multistring')
 				) {
 					$fields[$propertyInfo->Name] = explode(',', $fields[$propertyInfo->Name][0]);
 				}
 
-				// For type 'datetime', there's nothing to handle since D8 accepts the value as how Enterprise stores it.
 				if( $propertyInfo->Type == 'date' ) {
 					$value = $fields[$propertyInfo->Name][0];
 					if ( !empty($value) ) {
 						$ymdTtime = explode( 'T', $value ); // $value = 2014-10-31T00:00:00
 						$fields[$propertyInfo->Name] = array( $ymdTtime[0] );
+					}
+				}
+
+				if ( $propertyInfo->Type == 'datetime' ) {
+					$value = $fields[$propertyInfo->Name][0];
+					if ( !empty($value) ) {
+						$utcTimeString = gmdate('Y-m-d\TH:i:s', strtotime( $value ));
+						$fields[$propertyInfo->Name] = array( $utcTimeString );
 					}
 				}
 			}
