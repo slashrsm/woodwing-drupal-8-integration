@@ -498,7 +498,8 @@ function getEnterpriseNodeFields( $contentType )
 			$dateTimeType = null;
 			if ( $nodeProperties['widget_type'] == 'datetime_default' ){
 				$dateTimeType = $field->getSetting( 'datetime_type' );
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] );
+
+				$nodeProperties['default_value'] = isset($nodeProperties['default_value'][0]['value']) ? ( $nodeProperties['default_value'][0]['value'] ) : NULL;
 			}
 
 			// Handle comment field.
@@ -643,7 +644,7 @@ function getEnterpriseNodeFields( $contentType )
 				// If the max value is not determined, we set the maximum for ContentStation, which is 2147483647.
 				$nodeProperties['max_value'] = ( empty( $max_value ) ) ? '2147483647' : $max_value;
 				$nodeProperties['min_value'] = ( empty( $min_value ) ) ? '-999999999' : $min_value;
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] )
+				$nodeProperties['default_value'] = isset( $nodeProperties['default_value'][0]['value'] )
 					? ( $nodeProperties['default_value'][0]['value'] )
 					: null;
 
@@ -651,7 +652,7 @@ function getEnterpriseNodeFields( $contentType )
 				// ContentStation restriction, take the smallest maximum.
 				$nodeProperties['max_value'] = ( empty( $max_value) ) ? '99999999.99' : $max_value;
 				$nodeProperties['min_value'] = ( empty( $min_value) ) ? '-999999.99' : $min_value;
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] )
+				$nodeProperties['default_value'] = isset( $nodeProperties['default_value'][0]['value'] )
 					? ( $nodeProperties['default_value'][0]['value'] )
 					: null;
 			}
@@ -684,7 +685,7 @@ function getEnterpriseNodeFields( $contentType )
 
 				$defaultValue = null;
 				if( $nodeProperties['cardinality'] == 1 ) {
-					$defaultKey = $nodeProperties['default_value'][0]['value'];
+					$defaultKey = isset($nodeProperties['default_value'][0]['value']) ? $nodeProperties['default_value'][0]['value'] : NULL;
 					$defaultValue = is_null( $defaultKey ) ? null : $listOptions[$defaultKey];
 				} else { // When the cardinality is greater than one, there can be more than one default value.
 					$totalDefaultValues = count( $nodeProperties['default_value'] );
@@ -950,7 +951,7 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 		case 'options_buttons' :
 		case 'options_select' :
 			$propertyInfoType = 'list';
-			if ( in_array( $fieldInfoType, array( 'list_float', 'list_integer', 'list_string', 'taxonomy_term_reference' ) )
+			if ( in_array( $fieldInfoType, array( 'list_float', 'list_integer', 'list_string', 'entity_reference' ) )
 				&& $cardinality != 1
 			) {
 				$propertyInfoType = 'multilist';
@@ -982,7 +983,9 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 		case 'text_textarea_with_summary': // Text (formatted, long, summary)
 			$propertyInfoType = ( $hasTextFilter ) ? 'articlecomponentselector' : 'multiline';
 			break;
-		case 'taxonomy_autocomplete' :
+		case 'entity_reference_autocomplete' :
+		case 'entity_reference_autocomplete_tags' :
+			// @todo Is this the correct behavior for non-tags autocomplete?
 			$propertyInfoType = 'multistring';
 			break;
 		case 'datetime_default' :
