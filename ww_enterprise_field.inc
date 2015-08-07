@@ -1,4 +1,5 @@
 <?php
+use Drupal\Core\Form\OptGroup;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\filter\Entity\FilterFormat;
@@ -515,90 +516,60 @@ function getEnterpriseNodeFields( $contentType )
 				$nodeProperties['default_value'] = $nodeProperties['list_options'][$defaultId];
 			}
 
-			if ( $nodeProperties['type'] == 'taxonomy_term_reference' && ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' || $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons') ) {
-				$defaultValue = '';
-				$allowedValues = options_allowed_values( $field->getFieldStorageDefinition(), null);
-				$vid = $allowedValues[0]['vocabulary'];
-				$voc = \Drupal\taxonomy\Entity\Vocabulary::load( $vid );
-				$vocabulary = $voc->label();
+			// @todo Temporary limit support for entity references to term references.
+			if ($nodeProperties['type'] == 'entity_reference' && $field->getFieldStorageDefinition()->getSetting('target_type') == 'taxonomy_term') {
 
-				/** @var \Drupal\taxonomy\Entity\Vocabulary $voc */
-				$storedTermEntity = getWoodWingSuggestionEntity( $voc->uuid() );
-				$ww_term_entity = (!empty($storedTermEntity)) ? $storedTermEntity : null;
-
-				if ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' ) {
-					if ( $nodeProperties['cardinality'] == 1 ) {
-						$tid = $nodeProperties['default_value'][0]['target_id'];
-						if ( !is_null( $tid ) ) { // option -none-
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ) );
-							/** @var \Drupal\taxonomy\Entity\Term $term */
-							$term = $terms[$tid];
-							$defaultValue = $term->getName();
-						}
-					} else {
-						$totalDefaultValues = count( $nodeProperties['default_value'] );
-						$defaultValues = array();
-						for( $ctr=0; $ctr < $totalDefaultValues; $ctr++ ) {
-							$tid = $nodeProperties['default_value'][$ctr]['target_id'];
-							if( is_null( $tid ) ) {
-								continue; // Don't add the option '- None -' as default when there is more than one default.
-							}
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ));
-							$term = $terms[$tid];
-							$defaultValues[] = $term->getName();
-						}
-						if( $defaultValues ) {
-							$defaultValue = implode( ',', $defaultValues );
-						}
-					}
-				} elseif ( $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons' ) {
-					$tree = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->loadTree( $vid, 0, NULL, TRUE );
-					$listOptionsValues = array();
-					if ( $tree ) foreach ( $tree as $term ) {
-						/** @var Drupal\taxonomy\Entity\Term $term */
-						/** @var \Drupal\Core\Field\Plugin\Field\FieldType\StringItem $name */
-						$name = $term->name[0];
-						$name = $name->getValue();
-						$listOptionsValues[]  = $name['value'];
-					}
-
-					if( !$nodeProperties['required'] ) {
-						// None is only allowed when the field is not a mandatory field.
-						array_unshift( $listOptionsValues, '- None -' ); // In D8, 'none' option is always set at the top of the list.
-					} else {
-						array_unshift( $listOptionsValues, '' );
-					}
-					$nodeProperties['list_options'] = $listOptionsValues; // Only store the options values(labels).
-
-					$defaultValue = null;
-					if( $nodeProperties['cardinality'] == 1 ) {
-						$tid = $nodeProperties['default_value'][0]['target_id'];
-						if ( !is_null( $tid ) ) {
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ) );
-							$term = $terms[$tid];
-							$defaultValue = $term->getName();
-						}
-					} else { // When the cardinality is greater than one, there can be more than one default value.
-						$totalDefaultValues = count( $nodeProperties['default_value'] );
-						$defaultValues = array();
-						for( $ctr=0; $ctr < $totalDefaultValues; $ctr++ ) {
-							$tid = $nodeProperties['default_value'][$ctr]['target_id'];
-							if( is_null( $tid ) ) {
-								continue; // Don't add the option '- None -' as default when there is more than one default.
-							}
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ));
-							$term = $terms[$tid];
-							$defaultValues[] = $term->getName();
-						}
-						if( $defaultValues ) {
-							$defaultValue = implode( ',', $defaultValues );
-						}
-					}
+				$handlerSettings = $field->getSetting('handler_settings');
+				$vid = NULL;
+				if (!empty($handlerSettings['target_bundles'])) {
+					$vid = reset($handlerSettings['target_bundles']);
 				}
 
-				$nodeProperties['vocabulary_name'] = $vocabulary;
-				$nodeProperties['ww_term_entity'] = $ww_term_entity;
-				$nodeProperties['default_value'] = $defaultValue;
+				if ($vid) {
+					$vocabulary = \Drupal\taxonomy\Entity\Vocabulary::load($vid);
+					$nodeProperties['vocabulary_name'] = $vocabulary->label();
+					$nodeProperties['type'] = 'taxonomy_term_reference';
+
+					/** @var \Drupal\taxonomy\Entity\Vocabulary $vocabulary */
+					$storedTermEntity = getWoodWingSuggestionEntity( $vocabulary->uuid() );
+					$nodeProperties['ww_term_entity'] = (!empty($storedTermEntity)) ? $storedTermEntity : null;
+				}
+			}
+
+			// This is only executed if we were able to detect the referenced
+			// vocabulary above.
+			if ( $nodeProperties['type'] == 'taxonomy_term_reference') {
+
+				$defaultValues = [];
+				foreach ($initializedNode->$key as $item) {
+					if ($item->entity) {
+						$defaultValues[] = $item->entity->label();
+					}
+				}
+				$nodeProperties['default_value'] = implode(',', $defaultValues);
+
+				if ( $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons' ) {
+					// Limit the settable options for the current user account.
+					$listOptionsValues = $field
+						->getFieldStorageDefinition()
+						->getOptionsProvider('target_id', $initializedNode)
+						->getSettableOptions(\Drupal::currentUser());
+					$context = array(
+						'fieldDefinition' => $field,
+						'entity' => $initializedNode,
+					);
+					\Drupal::moduleHandler()->alter('options_list', $options, $context);
+
+					// Remove leading -, assume those are depth marker.
+					// @todo Find a way to improve this.
+					$listOptionsValues = array_map(function ($value) {
+						return ltrim($value, '-');
+					}, $listOptionsValues);
+
+					// Flatten and ensure a numeric list.
+					$nodeProperties['list_options'] = array_values(OptGroup::flattenOptions($listOptionsValues));
+				}
+
 			}
 
 			$nodeProperties['display_name'] = $field->getLabel(); // Field display name;
@@ -1158,7 +1129,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 
 			if ( !is_null( $field_machine_name ) ) {
 				$val = null;
-				$fieldType = $node->$field_machine_name->getFieldDefinition()->field_type;
+				$fieldType = $node->$field_machine_name->getFieldDefinition()->getType();
 				switch ( $fieldType ) {
 					case 'boolean' :
 						$val = intval( $values[0] );
@@ -1239,7 +1210,8 @@ function mapNodeValues( $node, $formValues, $previewMode )
 
 						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
-					case 'taxonomy_term_reference': //
+					case 'entity_reference': //
+						// @todo Expand to support all kinds of references.
 						$termIds = array();
 						foreach ( $values as $value ) {
 							if ($value != '') {
