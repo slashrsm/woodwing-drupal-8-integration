@@ -521,13 +521,17 @@ function getEnterpriseNodeFields( $contentType )
 			if ($nodeProperties['type'] == 'entity_reference' && $field->getFieldStorageDefinition()->getSetting('target_type') == 'taxonomy_term') {
 
 				$handlerSettings = $field->getSetting('handler_settings');
-				$vid = NULL;
+
 				if (!empty($handlerSettings['target_bundles'])) {
 					$vid = reset($handlerSettings['target_bundles']);
-				}
-
-				if ($vid) {
 					$vocabulary = \Drupal\taxonomy\Entity\Vocabulary::load($vid);
+
+					// Avoid a fatal error if the vocabulary can not be loaded.
+					if ( !$vocabulary ) {
+						\Drupal::logger( 'ww_enterprise' )->error( 'Failed to load vocabulary @vid, used by field @field_name on node type @type.', ['@vid' => $vid, '@field_name' => $key, '@type' => $field->getTargetBundle()] );
+						continue;
+					}
+
 					$nodeProperties['vocabulary_name'] = $vocabulary->label();
 					$nodeProperties['type'] = 'taxonomy_term_reference';
 
