@@ -520,6 +520,13 @@ function getEnterpriseNodeFields( $contentType )
 				$allowedValues = options_allowed_values( $field->getFieldStorageDefinition(), null);
 				$vid = $allowedValues[0]['vocabulary'];
 				$voc = \Drupal\taxonomy\Entity\Vocabulary::load( $vid );
+
+				// Avoid a fatal error if the vocabulary can not be loaded.
+				if ( !$voc ) {
+					\Drupal::logger( 'ww_enterprise' )->error( 'Failed to load vocabulary @vid, used by field @field_name', [''] );
+					continue;
+				}
+
 				$vocabulary = $voc->label();
 
 				/** @var \Drupal\taxonomy\Entity\Vocabulary $voc */
