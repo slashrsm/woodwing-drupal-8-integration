@@ -523,7 +523,7 @@ function getEnterpriseNodeFields( $contentType )
 
 				// Avoid a fatal error if the vocabulary can not be loaded.
 				if ( !$voc ) {
-					\Drupal::logger( 'ww_enterprise' )->error( 'Failed to load vocabulary @vid, used by field @field_name', [''] );
+					\Drupal::logger( 'ww_enterprise' )->error( 'Failed to load vocabulary @vid, used by field @field_name', ['@vid' => $vid, '@field_name' => $key] );
 					continue;
 				}
 
