@@ -17,7 +17,6 @@ include_once(drupal_get_path('module', 'ww_enterprise').'/ww_enterprise_xmlrpc.i
  * @param \Drupal\node\NodeInterface $node The node being accessed.
  * @param string $op The action 'view', 'create', 'update', 'delete'.
  * @param \Drupal\Core\Session\AccountInterface $account The account data. (required by interface).
- * @param string $langcode The language code. The language code (required by interface).
  *
  * @return \Drupal\Core\Access\AccessResult The access result, to be handled by the Drupal core.
  */
