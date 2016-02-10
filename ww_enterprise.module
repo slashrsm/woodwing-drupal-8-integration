@@ -17,11 +17,10 @@ include_once(drupal_get_path('module', 'ww_enterprise').'/ww_enterprise_xmlrpc.i
  * @param \Drupal\node\NodeInterface $node The node being accessed.
  * @param string $op The action 'view', 'create', 'update', 'delete'.
  * @param \Drupal\Core\Session\AccountInterface $account The account data. (required by interface).
- * @param string $langcode The language code. The language code (required by interface).
  *
  * @return \Drupal\Core\Access\AccessResult The access result, to be handled by the Drupal core.
  */
-function ww_enterprise_node_access( \Drupal\node\NodeInterface $node, $op, \Drupal\Core\Session\AccountInterface $account, $langcode )
+function ww_enterprise_node_access( \Drupal\node\NodeInterface $node, $op, \Drupal\Core\Session\AccountInterface $account )
 {
 	// We are only interested in view actions.
 	if ( $op != 'view' || !\Drupal::hasRequest() ) {
