@@ -376,7 +376,7 @@ function getEnterpriseNodeFields( $contentType )
 					$nodeProperties['name'] = $key;
 					$nodeProperties['id'] = $contentType . '_' . $key;
 					$defaultValue = $initializedNode->title->getValue();
-					$nodeProperties['default_value'] = $defaultValue[0]['value'];
+					$nodeProperties['default_value'] = isset( $defaultValue[0]['value'] ) ? $defaultValue[0]['value'] : '' ;
 					$nodeProperties['required'] = true;
 					$nodeProperties['display_name'] = 'Title';
 					$nodeProperties['property_info_type'] = 'string';
@@ -743,9 +743,17 @@ function getEnterpriseNodeFields( $contentType )
 	$sortedFieldDefinition['basic_fields'] = $enterpriseFieldDefinition['basic_fields'];
 	$sortedFieldDefinition['errors'] = $enterpriseFieldDefinition['errors'];
 
+	$formCustomComponentsByWeight = array();
 	foreach ( $formComponents as $componentKey => $component ) {
-		if ( array_key_exists( $componentKey, $enterpriseFieldDefinition['custom_fields'] ) ){
-			$sortedFieldDefinition['custom_fields'][$componentKey] = $enterpriseFieldDefinition['custom_fields'][$componentKey];
+		if ( array_key_exists( $componentKey, $enterpriseFieldDefinition['custom_fields'] ) ) {
+			$weight = isset($component['weight']) ? $component['weight'] : 0;
+			$formCustomComponentsByWeight[$componentKey] = $weight;
+		}
+	}
+	asort( $formCustomComponentsByWeight );
+	foreach ( $formCustomComponentsByWeight as $componentName => $weight ) {
+		if ( array_key_exists( $componentName, $enterpriseFieldDefinition['custom_fields'] ) ){
+			$sortedFieldDefinition['custom_fields'][$componentName] = $enterpriseFieldDefinition['custom_fields'][$componentName];
 		}
 	}
 	return $sortedFieldDefinition;
