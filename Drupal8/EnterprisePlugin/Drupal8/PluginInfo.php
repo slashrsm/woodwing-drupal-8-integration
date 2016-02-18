@@ -9,7 +9,7 @@
 
 require_once BASEDIR.'/server/interfaces/plugins/EnterprisePlugin.class.php';
 require_once BASEDIR.'/server/interfaces/plugins/PluginInfoData.class.php';
- 
+
 class Drupal8_EnterprisePlugin extends EnterprisePlugin
 {
 	/**
@@ -18,11 +18,11 @@ class Drupal8_EnterprisePlugin extends EnterprisePlugin
 	 * @return PluginInfoData The composed PluginInfoData object.
 	 */
 	public function getPluginInfo()
-	{ 
-		$info = new PluginInfoData(); 
-		$info->DisplayName = 'Drupal 8 Beta';
-		$info->Version     = '9.5.0 Build 123'; // don't use PRODUCTVERSION.
-		$info->Description = 'Publishing service for Drupal 8 Beta.';
+	{
+		$info = new PluginInfoData();
+		$info->DisplayName = 'Drupal 8';
+		$info->Version     = '9.9.0 Build 1063'; // don't use PRODUCTVERSION.
+		$info->Description = 'Publishing service for Drupal 8.';
 		$info->Copyright   = COPYRIGHT_WOODWING;
 		return $info;
 	}
@@ -33,8 +33,8 @@ class Drupal8_EnterprisePlugin extends EnterprisePlugin
 	 * @see EnterprisePlugin.class.php
 	 * @return array An array of connector interfaces.
 	 */
-	final public function getConnectorInterfaces() 
-	{ 
+	final public function getConnectorInterfaces()
+	{
 		return array(
 			'PubPublishing_EnterpriseConnector',
 			'WebApps_EnterpriseConnector',
@@ -44,7 +44,7 @@ class Drupal8_EnterprisePlugin extends EnterprisePlugin
 			'AutocompleteProvider_EnterpriseConnector',
 		);
 	}
-	
+
 	/**
 	 * For first time installation, disable this plug-in.
 	 * See EnterprisePlugin class for more details.

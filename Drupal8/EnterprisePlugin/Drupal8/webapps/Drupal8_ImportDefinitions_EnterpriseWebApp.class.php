@@ -11,65 +11,68 @@
 
 require_once BASEDIR.'/server/utils/htmlclasses/EnterpriseWebApp.class.php';
 
-class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp 
+class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 {
-	/** 
+	/**
 	 * List of pub channels for which this plugin can publish (with PublishSystem set to
 	 * Drupal 8) and where the admin user has access to.
 	 *
 	 * @var array $pubChannelInfos List of PubChannelInfo data objects
 	 */
 	private $pubChannelInfos;
-	
-	public function getTitle()      { return 'Import Content Types from Drupal 8 Beta'; }
+	static private $selectedPubChannelInfos = null;
+
+	public function getTitle()      { return 'Import Content Types from Drupal 8'; }
 	public function isEmbedded()    { return true; }
 	public function getAccessType() { return 'admin'; }
-	
+
 	/**
 	 * Called by the core server. Builds the HTML body of the web application.
 	 *
 	 * @return string HTML
 	 */
-	public function getHtmlBody() 
+	public function getHtmlBody()
 	{
 		// Intercept user input.
 		$importBtnPressed = isset($_REQUEST['import']);
-        $pubChannelToImport = isset($_REQUEST['pubchanneldropdown']) ? $_REQUEST['pubchanneldropdown'] : 'all';
-        $importContentTypes = ( isset($_REQUEST['content-types']) ? $_REQUEST['content-types'] : false);
-        $importTaxonomies = ( isset($_REQUEST['taxonomies']) ? $_REQUEST['taxonomies'] : false);
+		$pubChannelToImport = isset($_REQUEST['pubchanneldropdown']) ? $_REQUEST['pubchanneldropdown'] : 'all';
+		$importContentTypes = ( isset($_REQUEST['content-types']) ? $_REQUEST['content-types'] : false);
+		$importTaxonomies = ( isset($_REQUEST['taxonomies']) ? $_REQUEST['taxonomies'] : false);
 		$importStatus = '';
 		// Build the HTML form.
 		require_once BASEDIR.'/server/utils/htmlclasses/HtmlDocument.class.php';
 		$htmlTemplateFile = dirname(__FILE__).'/importdefs.htm';
 		$htmlBody = HtmlDocument::loadTemplate( $htmlTemplateFile );
-        require_once BASEDIR.'/server/bizclasses/BizAdmPublication.class.php';
-        $pubChannelInfos = BizAdmPublication::getPubChannelInfosForPublishSystem( 'Drupal8' );
+		require_once BASEDIR.'/server/bizclasses/BizAdmPublication.class.php';
+		$pubChannelInfos = BizAdmPublication::getPubChannelInfosForPublishSystem( 'Drupal8' );
 
 		if( $importBtnPressed && ( $importContentTypes || $importTaxonomies )) {
 			try {
 				// Raise the max execution time to ensure that the plugin has enough time to get and save all the data.
 				set_time_limit(3600);
 
-                if( $pubChannelToImport == 'all' ){
-				    $this->pubChannelInfos = $pubChannelInfos;
-                } else {
-                    foreach( $pubChannelInfos as $pubChannelKey => $selectedPubChannel ){
-                        if( $selectedPubChannel->Id == $pubChannelToImport ){
-                            $this->pubChannelInfos = array( $pubChannelInfos[$pubChannelKey] );
-                            break;
-                        }
-                    }
-                }
+				if( $pubChannelToImport == 'all' ){
+					$this->pubChannelInfos = $pubChannelInfos;
+				} else {
+					foreach( $pubChannelInfos as $pubChannelKey => $selectedPubChannel ){
+						if( $selectedPubChannel->Id == $pubChannelToImport ){
+							$this->pubChannelInfos = array( $pubChannelInfos[$pubChannelKey] );
+							break;
+						}
+					}
+				}
 
-                if( $importContentTypes ){
-                    $this->importPublishFormTemplates();
-                }
+				$this->setContext();
 
-                if( $importTaxonomies ){
-                    $this->importTermEntitiesAndTerms(); // Make sure to import TermEntities&Terms first, as the DB id is needed to populate the field in the custom props below.
-                }
+				if( $importContentTypes ){
+					$this->importPublishFormTemplates();
+				}
 
-                $this->importCustomObjectProperties();
+				if( $importTaxonomies ){
+					$this->importTermEntitiesAndTerms(); // Make sure to import TermEntities&Terms first, as the DB id is needed to populate the field in the custom props below.
+				}
+
+				$this->importCustomObjectProperties();
 
 				$this->importPublishFormDialogs();
 				$htmlBody = $this->printImportResults( $importStatus, $htmlBody );
@@ -77,21 +80,48 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 				$importStatus = '<font color=red>Import failed:' . $e->getMessage() . '</font>';
 			}
 		} else if( $importBtnPressed && ( !$importContentTypes && !$importTaxonomies )){
-            $importStatus = '<font color=red>Import failed: None of the checkboxes are checked </font>';
-        }
+			$importStatus = '<font color=red>Import failed: None of the checkboxes are checked </font>';
+		}
 
-        $pubChannelDropDown = '<option selected value="all">All</option>';
+		$pubChannelDropDown = '<option selected value="all">All</option>';
 
-        if( $pubChannelInfos ){
-            foreach( $pubChannelInfos as $pubChannel ){
-                $pubChannelDropDown .= '<option value=\'' . $pubChannel->Id . '\'>' . $pubChannel->Name . '</option>';
-            }
-        }
+		if( $pubChannelInfos ){
+			foreach( $pubChannelInfos as $pubChannel ){
+				$pubChannelDropDown .= '<option value=\'' . $pubChannel->Id . '\'>' . $pubChannel->Name . '</option>';
+			}
+		}
 
 		$htmlBody = $this->printErrorsWarnings( $htmlBody, false, false );
 		$htmlBody = str_replace ( '<!--PUB_CHANNEL_DROP_DOWN-->', $pubChannelDropDown, $htmlBody );
-        $htmlBody = str_replace ( '<!--IMPORT_STATUS-->', $importStatus, $htmlBody );
+		$htmlBody = str_replace ( '<!--IMPORT_STATUS-->', $importStatus, $htmlBody );
 		return $htmlBody;
+	}
+
+	/**
+	 * Sets the context in which the Web Application runs. For now the selected PubChannelInfos are set.
+	 */
+	private function setContext()
+	{
+		self::$selectedPubChannelInfos = $this->pubChannelInfos;
+	}
+
+	/**
+	 * Returns the context in which the Web Application runs (for now only the selected PubChannelInfos).
+	 *
+	 * @return the context in which the Web Application runs.
+	 */
+	static public function getContext()
+	{
+		return self::$selectedPubChannelInfos;
+	}
+
+	/**
+	 * Resets the context. This method must be called after the context is read by getContext(). The reason is to
+	 * limit the context to the processing of the Web Application.
+	 */
+	static public function resetContext()
+	{
+		self::$selectedPubChannelInfos = null;
 	}
 
 	/**
@@ -216,7 +246,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 		$htmlBody = str_replace('<!--PAR:DISPLAY_WARNINGMSG-->', $displayWarningMessages, $htmlBody );
 		return $htmlBody;
 	}
-	
+
 	/**
 	 * Let the core validate and install the custom properties introduced by our plugin.
 	 */
@@ -226,7 +256,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 		$pluginErrs = null;
 		BizProperty::validateAndInstallCustomProperties( 'Drupal8', $pluginErrs, false );
 	}
-	
+
 	/**
 	 * Imports the Publish Form Dialogs.
 	 */
@@ -237,13 +267,13 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 		// document id provided by the template.
 		if ($this->pubChannelInfos) {
 			require_once BASEDIR.'/server/bizclasses/BizPublishing.class.php';
-            foreach ( $this->pubChannelInfos  as $pubChannelInfo ) {
-			    $resp = $this->queryTemplatesFromDb( $pubChannelInfo->Id );
-			    BizPublishing::createPublishingDialogsWhenMissing($pubChannelInfo->Id, $resp);
-            }
+			foreach ( $this->pubChannelInfos  as $pubChannelInfo ) {
+				$resp = $this->queryTemplatesFromDb( $pubChannelInfo->Id );
+				BizPublishing::createPublishingDialogsWhenMissing($pubChannelInfo->Id, $resp);
+			}
 		}
 	}
-	
+
 	/**
 	 * Retrieves the PublishFormTemplate objects provided (hardcoded) by the plugin
 	 * and inserts them into the Enterprise DB in case they do not exist yet.
@@ -318,7 +348,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 				}
 				$imported[$publishSystemId] = true;
 			}
- 		}
+		}
 	}
 
 	/**
@@ -334,8 +364,8 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 		require_once dirname(__FILE__).'/../Utils.class.php'; // WW_Plugins_Drupal8_Utils.
 
 		// Delete the Term Entities and all belonging Terms.
-        $termEntities = DBAdmAutocompleteTermEntity::getTermEntityByProviderAndPublishSystemId(
-            WW_Plugins_Drupal8_Utils::DRUPAL8_PLUGIN_NAME, $publishSystemId );
+		$termEntities = DBAdmAutocompleteTermEntity::getTermEntityByProviderAndPublishSystemId(
+			WW_Plugins_Drupal8_Utils::DRUPAL8_PLUGIN_NAME, $publishSystemId );
 		if( $termEntities ) {
 			$service = new AdmDeleteAutocompleteTermEntitiesService();
 			$request = new AdmDeleteAutocompleteTermEntitiesRequest();
@@ -457,7 +487,7 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 	}
 
 	/**
-	 * Queries the Enterprise DB for PublishTemplate objects. For that it uses 
+	 * Queries the Enterprise DB for PublishTemplate objects. For that it uses
 	 * the built-in "PublishFormTemplates" Named Query.
 	 *
 	 * @param int $pubChannelId
@@ -466,21 +496,21 @@ class Drupal8_ImportDefinitions_EnterpriseWebApp extends EnterpriseWebApp
 	private function queryTemplatesFromDb( $pubChannelId )
 	{
 		require_once BASEDIR.'/server/services/wfl/WflNamedQueryService.class.php';
-		
+
 		$service = new WflNamedQueryService();
 		$req = new WflNamedQueryRequest();
 		$req->Ticket = BizSession::getTicket();
 		$req->User   = BizSession::getShortUserName();
 		$req->Query  = 'PublishFormTemplates';
-		
+
 		$queryParam = new QueryParam();
 		$queryParam->Property = 'PubChannelId';
 		$queryParam->Operation = '=';
 		$queryParam->Value = $pubChannelId;
 		$req->Params = array( $queryParam );
-		
+
 		$resp = $service->execute( $req );
-		
+
 		return $resp;
 	}
 
