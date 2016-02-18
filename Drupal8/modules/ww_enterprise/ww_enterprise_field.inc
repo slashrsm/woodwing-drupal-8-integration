@@ -1,4 +1,9 @@
 <?php
+use Drupal\Core\Form\OptGroup;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\filter\Entity\FilterFormat;
+use Drupal\user\UserInterface;
 
 /**
  * Validates a request using the Drupal authentication manager.
@@ -11,18 +16,21 @@
  */
 function validateRequest( \Symfony\Component\HttpFoundation\Request $request )
 {
-	// For some odd reason, the Drupal flood control already logs 5 failed attempts when we attempt to authenticate a
-	// single user. Five is also the default amount for the flood control setting to block further attempts. It can be
-	// that the Drupal core attempts multiple authentication providers and thus generates these logged attempts in the
-	// flood table. As a work around for now we set the maximum user attempts to 50 in the configuration.
-	$limit = \Drupal::config( 'user.flood' )->get( 'user_limit' );
-	if ($limit < 50 ) {
-		\Drupal::config('user.flood')
-			->set('user_limit', 50)
-			->save();
+
+	// Check if the current user is already authenticated, in that case, return
+	// that. This relies on a patched xmlrpc.routing.yml that enables basic_auth
+	// for the xmlrpc.php route.
+	$user = \Drupal::currentUser();
+	if ($user instanceof AccountProxyInterface) {
+		$user = $user->getAccount();
+	}
+	if ( $user->isAuthenticated() && $user instanceof UserInterface ) {
+		return $user;
 	}
 
 	// Authenticate anonymous users and those that have not yet been authenticated.
+	// @todo This module should not have to do this. It is not even clear how it
+	//   can work, without patching rest.module.
 	/** @var \Drupal\user\Entity\User $user */
 	$user = \Drupal::service( 'authentication' )->authenticate( $request );
 	$authenticated = ( $user instanceof \Drupal\user\Entity\User && $user->isAuthenticated() && !$user->isAnonymous() );
@@ -368,7 +376,7 @@ function getEnterpriseNodeFields( $contentType )
 					$nodeProperties['name'] = $key;
 					$nodeProperties['id'] = $contentType . '_' . $key;
 					$defaultValue = $initializedNode->title->getValue();
-					$nodeProperties['default_value'] = $defaultValue[0]['value'];
+					$nodeProperties['default_value'] = isset( $defaultValue[0]['value'] ) ? $defaultValue[0]['value'] : '' ;
 					$nodeProperties['required'] = true;
 					$nodeProperties['display_name'] = 'Title';
 					$nodeProperties['property_info_type'] = 'string';
@@ -440,7 +448,35 @@ function getEnterpriseNodeFields( $contentType )
 			$nodeProperties = initializeDataDefinition( $contentType );
 			$nodeProperties['name'] = $field->getName();
 			$nodeProperties['type'] = $field->getType();
-			$nodeProperties['widget_type'] = $formComponents[$key]['type'];
+			$nodeProperties['widget_type'] = ( isset( $formComponents[$key]['type'] ) )
+				? $formComponents[$key]['type'] :
+				'';
+
+			// If the widget type is not known we will want to get the default widget type for the field to see
+			// if that can be mapped to a known type. If that fails as well the field cannot be imported by default.
+			$knownWidgets = array(
+				'boolean_checkbox',
+				'datetime_default',
+				'comment_default',
+				'taxonomy_autocomplete',
+				'options_select',
+				'options_buttons',
+				'image_image',
+				'file_generic',
+				'string_textfield',
+				'string_textarea',
+				'text_textarea',
+				'text_textarea_with_summary',
+				'email_default',
+				'number',
+			);
+
+			if ( !in_array( $nodeProperties['widget_type'], $knownWidgets ) ) {
+				// Attempt to read out the default field type.
+				$defaultTypeInfo = \Drupal::service('plugin.manager.field.field_type')->getDefinition($nodeProperties['type']);
+				$nodeProperties['widget_type'] = $defaultTypeInfo['default_widget'];
+			}
+
 			$nodeProperties['has_text_filter'] = false;
 			// Only fields of type text, text_long and text_with_summary have text_processing in place.
 			$formattedTextFieldTypes = array(
@@ -462,94 +498,83 @@ function getEnterpriseNodeFields( $contentType )
 			$dateTimeType = null;
 			if ( $nodeProperties['widget_type'] == 'datetime_default' ){
 				$dateTimeType = $field->getSetting( 'datetime_type' );
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] );
+
+				$nodeProperties['default_value'] = isset($nodeProperties['default_value'][0]['value']) ? ( $nodeProperties['default_value'][0]['value'] ) : NULL;
 			}
 
-			if ( $nodeProperties['type'] == 'taxonomy_term_reference' && ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' || $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons') ) {
-				$defaultValue = '';
-				$allowedValues = $field->getItemDefinition()->getSetting( 'allowed_values' );
-				$vid = $allowedValues[0]['vocabulary'];
-				$vocs = \Drupal\taxonomy\Entity\Vocabulary::loadMultiple( array ( $vid ) );
-				$voc = $vocs[$vid];
-				$vocabulary = $voc->name;
+			// Handle comment field.
+			if ( $nodeProperties['widget_type'] == 'comment_default') {
+				/*
+					Property mapping:
+					===================
+					0: Hidden
+					1: Closed
+					2: Open
+				*/
 
-				/** @var \Drupal\taxonomy\Entity\Vocabulary $voc */
-				$storedTermEntity = getWoodWingSuggestionEntity( $voc->uuid() );
-				$ww_term_entity = (!empty($storedTermEntity)) ? $storedTermEntity : null;
+				$nodeProperties['list_options'] = array( 'Hidden','Closed','Open');
+				$defaultId = ( $nodeProperties['default_value'][0]['status'] );
+				$nodeProperties['default_value'] = $nodeProperties['list_options'][$defaultId];
+			}
 
-				if ( $nodeProperties['widget_type'] == 'taxonomy_autocomplete' ) {
-					if ( $nodeProperties['cardinality'] == 1 ) {
-						$tid = $nodeProperties['default_value'][0]['target_id'];
-						if ( !is_null( $tid ) ) { // option -none-
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ) );
-							/** @var \Drupal\taxonomy\Entity\Term $term */
-							$term = $terms[$tid];
-							$defaultValue = $term->getName();
-						}
-					} else {
-						$totalDefaultValues = count( $nodeProperties['default_value'] );
-						$defaultValues = array();
-						for( $ctr=0; $ctr < $totalDefaultValues; $ctr++ ) {
-							$tid = $nodeProperties['default_value'][$ctr]['target_id'];
-							if( is_null( $tid ) ) {
-								continue; // Don't add the option '- None -' as default when there is more than one default.
-							}
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ));
-							$term = $terms[$tid];
-							$defaultValues[] = $term->getName();
-						}
-						if( $defaultValues ) {
-							$defaultValue = implode( ',', $defaultValues );
-						}
-					}
-				} elseif ( $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons' ) {
-					$tree = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->loadTree( $vid, 0, NULL, TRUE );
-					$listOptionsValues = array();
-					if ( $tree ) foreach ( $tree as $term ) {
-						/** @var Drupal\taxonomy\Entity\Term $term */
-						/** @var \Drupal\Core\Field\Plugin\Field\FieldType\StringItem $name */
-						$name = $term->name[0];
-						$name = $name->getValue();
-						$listOptionsValues[]  = $name['value'];
+			// @todo Temporary limit support for entity references to term references.
+			if ($nodeProperties['type'] == 'entity_reference' && $field->getFieldStorageDefinition()->getSetting('target_type') == 'taxonomy_term') {
+
+				$handlerSettings = $field->getSetting('handler_settings');
+
+				if (!empty($handlerSettings['target_bundles'])) {
+					$vid = reset($handlerSettings['target_bundles']);
+					$vocabulary = \Drupal\taxonomy\Entity\Vocabulary::load($vid);
+
+					// Avoid a fatal error if the vocabulary can not be loaded.
+					if ( !$vocabulary ) {
+						\Drupal::logger( 'ww_enterprise' )->error( 'Failed to load vocabulary @vid, used by field @field_name on node type @type.', ['@vid' => $vid, '@field_name' => $key, '@type' => $field->getTargetBundle()] );
+						continue;
 					}
 
-					if( !$nodeProperties['required'] ) {
-						// None is only allowed when the field is not a mandatory field.
-						array_unshift( $listOptionsValues, '- None -' ); // In D8, 'none' option is always set at the top of the list.
-					} else {
-						array_unshift( $listOptionsValues, '' );
-					}
-					$nodeProperties['list_options'] = $listOptionsValues; // Only store the options values(labels).
+					$nodeProperties['vocabulary_name'] = $vocabulary->label();
+					$nodeProperties['type'] = 'taxonomy_term_reference';
 
-					$defaultValue = null;
-					if( $nodeProperties['cardinality'] == 1 ) {
-						$tid = $nodeProperties['default_value'][0]['target_id'];
-						if ( !is_null( $tid ) ) {
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ) );
-							$term = $terms[$tid];
-							$defaultValue = $term->getName();
-						}
-					} else { // When the cardinality is greater than one, there can be more than one default value.
-						$totalDefaultValues = count( $nodeProperties['default_value'] );
-						$defaultValues = array();
-						for( $ctr=0; $ctr < $totalDefaultValues; $ctr++ ) {
-							$tid = $nodeProperties['default_value'][$ctr]['target_id'];
-							if( is_null( $tid ) ) {
-								continue; // Don't add the option '- None -' as default when there is more than one default.
-							}
-							$terms = \Drupal\taxonomy\Entity\Term::loadMultiple( array ( $tid ));
-							$term = $terms[$tid];
-							$defaultValues[] = $term->getName();
-						}
-						if( $defaultValues ) {
-							$defaultValue = implode( ',', $defaultValues );
-						}
+					/** @var \Drupal\taxonomy\Entity\Vocabulary $vocabulary */
+					$storedTermEntity = getWoodWingSuggestionEntity( $vocabulary->uuid() );
+					$nodeProperties['ww_term_entity'] = (!empty($storedTermEntity)) ? $storedTermEntity : null;
+				}
+			}
+
+			// This is only executed if we were able to detect the referenced
+			// vocabulary above.
+			if ( $nodeProperties['type'] == 'taxonomy_term_reference') {
+
+				$defaultValues = [];
+				foreach ($initializedNode->$key as $item) {
+					if ($item->entity) {
+						$defaultValues[] = $item->entity->label();
 					}
 				}
+				$nodeProperties['default_value'] = implode(',', $defaultValues);
 
-				$nodeProperties['vocabulary_name'] = $vocabulary;
-				$nodeProperties['ww_term_entity'] = $ww_term_entity;
-				$nodeProperties['default_value'] = $defaultValue;
+				if ( $nodeProperties['widget_type'] == 'options_select' || $nodeProperties['widget_type'] == 'options_buttons' ) {
+					// Limit the settable options for the current user account.
+					$listOptionsValues = $field
+						->getFieldStorageDefinition()
+						->getOptionsProvider('target_id', $initializedNode)
+						->getSettableOptions(\Drupal::currentUser());
+					$context = array(
+						'fieldDefinition' => $field,
+						'entity' => $initializedNode,
+					);
+					\Drupal::moduleHandler()->alter('options_list', $options, $context);
+
+					// Remove leading -, assume those are depth marker.
+					// @todo Find a way to improve this.
+					$listOptionsValues = array_map(function ($value) {
+						return ltrim($value, '-');
+					}, $listOptionsValues);
+
+					// Flatten and ensure a numeric list.
+					$nodeProperties['list_options'] = array_values(OptGroup::flattenOptions($listOptionsValues));
+				}
+
 			}
 
 			$nodeProperties['display_name'] = $field->getLabel(); // Field display name;
@@ -573,11 +598,14 @@ function getEnterpriseNodeFields( $contentType )
 			} elseif( ( $nodeProperties['widget_type'] == 'string_textfield' || // text (plain)
 				$nodeProperties['widget_type'] == 'string_textarea'  || // text (plain, long)
 				$nodeProperties['widget_type'] == 'text_textarea'    || // text (formatted, long)
-				$nodeProperties['widget_type'] == 'text_textarea_with_summary' // text (formatted, long, summary)
+				$nodeProperties['widget_type'] == 'text_textarea_with_summary' || // text (formatted, long, summary)
+				$nodeProperties['widget_type'] == 'email_default' // Email field.
 			)
 			) {
 				$nodeProperties['max_length'] = $field->getSetting( 'max_length' );
-				$nodeProperties['default_value'] = $nodeProperties['default_value'][0]['value'];
+				$nodeProperties['default_value'] = (isset( $nodeProperties['default_value'][0]['value'] ))
+					? $nodeProperties['default_value'][0]['value']
+					: '';
 			}
 
 			if ( $nodeProperties['widget_type'] == 'file_generic' ) {
@@ -620,7 +648,7 @@ function getEnterpriseNodeFields( $contentType )
 				// If the max value is not determined, we set the maximum for ContentStation, which is 2147483647.
 				$nodeProperties['max_value'] = ( empty( $max_value ) ) ? '2147483647' : $max_value;
 				$nodeProperties['min_value'] = ( empty( $min_value ) ) ? '-999999999' : $min_value;
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] )
+				$nodeProperties['default_value'] = isset( $nodeProperties['default_value'][0]['value'] )
 					? ( $nodeProperties['default_value'][0]['value'] )
 					: null;
 
@@ -628,7 +656,7 @@ function getEnterpriseNodeFields( $contentType )
 				// ContentStation restriction, take the smallest maximum.
 				$nodeProperties['max_value'] = ( empty( $max_value) ) ? '99999999.99' : $max_value;
 				$nodeProperties['min_value'] = ( empty( $min_value) ) ? '-999999.99' : $min_value;
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] )
+				$nodeProperties['default_value'] = isset( $nodeProperties['default_value'][0]['value'] )
 					? ( $nodeProperties['default_value'][0]['value'] )
 					: null;
 			}
@@ -649,8 +677,7 @@ function getEnterpriseNodeFields( $contentType )
 			if( $nodeProperties['type'] == 'list_float' || $nodeProperties['type'] == 'list_integer' ||
 				$nodeProperties['type'] == 'list_string'
 			) { // previously known as list_text in Drupal 7.
-				$listOptions = $field->getSetting( 'allowed_values' );
-
+				$listOptions = options_allowed_values( $field->getFieldStorageDefinition(), null );
 				$listOptionsValues = array_values( $listOptions );
 				if( !$nodeProperties['required'] ) {
 					// None is only allowed when the field is not a mandatory field.
@@ -662,7 +689,7 @@ function getEnterpriseNodeFields( $contentType )
 
 				$defaultValue = null;
 				if( $nodeProperties['cardinality'] == 1 ) {
-					$defaultKey = $nodeProperties['default_value'][0]['value'];
+					$defaultKey = isset($nodeProperties['default_value'][0]['value']) ? $nodeProperties['default_value'][0]['value'] : NULL;
 					$defaultValue = is_null( $defaultKey ) ? null : $listOptions[$defaultKey];
 				} else { // When the cardinality is greater than one, there can be more than one default value.
 					$totalDefaultValues = count( $nodeProperties['default_value'] );
@@ -688,12 +715,15 @@ function getEnterpriseNodeFields( $contentType )
 			);
 			$nodeProperties['has_display_summary'] = (bool) $field->getSetting( 'display_summary' );
 			$nodeProperties['description'] = $field->getItemDefinition()->getDescription();
-			$errors = validateFieldDefinition( $nodeProperties, 'custom' );
+			$warnOnly = false;
+			$errors = validateFieldDefinition( $nodeProperties, 'custom', $warnOnly );
 
-			if ( empty( $errors ) ) {
+			if ( empty( $errors ) || $warnOnly ) {
 				// Add to the list:
 				$enterpriseFieldDefinition['custom_fields'][$field->getName()] = $nodeProperties;
-			} else {
+			}
+
+			if (!empty( $errors ) ) {
 				$enterpriseFieldDefinition['errors'][$field->getName()] = $errors;
 				foreach ( $errors as $error ) {
 					$message = $error['content_type'] . ':' . $error['field_name'] . ' - ' . $error['message'];
@@ -713,9 +743,17 @@ function getEnterpriseNodeFields( $contentType )
 	$sortedFieldDefinition['basic_fields'] = $enterpriseFieldDefinition['basic_fields'];
 	$sortedFieldDefinition['errors'] = $enterpriseFieldDefinition['errors'];
 
+	$formCustomComponentsByWeight = array();
 	foreach ( $formComponents as $componentKey => $component ) {
-		if ( array_key_exists( $componentKey, $enterpriseFieldDefinition['custom_fields'] ) ){
-			$sortedFieldDefinition['custom_fields'][$componentKey] = $enterpriseFieldDefinition['custom_fields'][$componentKey];
+		if ( array_key_exists( $componentKey, $enterpriseFieldDefinition['custom_fields'] ) ) {
+			$weight = isset($component['weight']) ? $component['weight'] : 0;
+			$formCustomComponentsByWeight[$componentKey] = $weight;
+		}
+	}
+	asort( $formCustomComponentsByWeight );
+	foreach ( $formCustomComponentsByWeight as $componentName => $weight ) {
+		if ( array_key_exists( $componentName, $enterpriseFieldDefinition['custom_fields'] ) ){
+			$sortedFieldDefinition['custom_fields'][$componentName] = $enterpriseFieldDefinition['custom_fields'][$componentName];
 		}
 	}
 	return $sortedFieldDefinition;
@@ -726,13 +764,14 @@ function getEnterpriseNodeFields( $contentType )
  *
  * @param array $fieldDefinition The definition to be validated.
  * @param string $type The type of the field to be validated.
+ * @param bool $warnOnly Whether or not the errors should block the import of this field.
  * @return array List of found errors.
  */
-function validateFieldDefinition( $fieldDefinition, $type )
+function validateFieldDefinition( &$fieldDefinition, $type, &$warnOnly=false )
 {
 	$errors = array();
 	$severity = ( $fieldDefinition['required'] ) ? 'error' : 'warn';
-	$unsupportedFieldTypes = array(	'text' );
+	$unsupportedFieldTypes = array(	'text' ); //  text (formatted)
 
 	$requiredFieldMessage = ( $fieldDefinition['required'] ) ? '(This is a required field. However, it could not be imported.)' : '';
 
@@ -769,7 +808,9 @@ function validateFieldDefinition( $fieldDefinition, $type )
 
 	if ( is_null( $fieldDefinition['property_info_type'] ) ) { // The PropertyInfoType needs to be known (indicates a valid type).
 		if( !in_array( $fieldDefinition['type'], $unsupportedFieldTypes ) ) {
-			$errors[] = createError( $fieldName, 'The Property Info Type should not be null.' . $requiredFieldMessage, $contentType, $severity );
+			$errors[] = createError( $fieldName, 'The Property Info Type could not be determined for field type \''
+				. $fieldDefinition['type'] . '\' and widget type \'' . $fieldDefinition['widget_type']
+				. '\' ' .$requiredFieldMessage, $contentType, $severity );
 		}
 	}
 
@@ -815,16 +856,22 @@ function validateFieldDefinition( $fieldDefinition, $type )
 					$contentType, $severity );
 				break;
 			case 'datetime': // Field Type date time
-				// Business Rule: Cardinality has to be 1 for a date time
+				// Business Rule: Cardinality has to be 1 for a date time.
 				if ( $fieldDefinition['cardinality'] != 1 ) {
 					$errors[] = createError( $fieldName, 'The cardinality is invalid; ' . $fieldDefinition['cardinality'] .
 						' is not valid for Fields of type ' . $fieldDefinition['widget_type']. '. ' .$requiredFieldMessage,
 						$contentType, $severity );
 				}
 				if( $fieldDefinition['default_value'] ) {
+					if ( empty( $errors ) ) {
+						$warnOnly = true;
+						$requiredFieldMessage = ''; // Field will not lean on this error for the import.
+					}
 					$errors[] = createError( $fieldName, 'The default value is not supported; ' . $fieldDefinition['default_value'] .
 						' is not supported for Fields of type ' . $fieldDefinition['widget_type']. '. ' .$requiredFieldMessage,
-						$contentType, $severity );
+						$contentType, 'warn' );
+
+					$fieldDefinition['default_value'] = null;
 				}
 				break;
 			case 'file' : // Field Type File / Collection Block.
@@ -870,10 +917,12 @@ function validateFieldDefinition( $fieldDefinition, $type )
 					);
 				}
 				break;
+			case 'email' : // email field.
 			case 'string' :     // text (plain)
 			case 'string_long': // text (plain, long)
 			case 'text_long':   // text (formatted, long)
 			case 'text_with_summary': // text (formatted, long, summary)
+			case 'comment': // Comment field.
 				if ( $fieldDefinition['cardinality'] != 1 ) {
 					$errors[] = createError( $fieldName ,
 						'Cardinality has to be 1 for fields of type "'.$fieldDefinition['type'].'". Encountered '
@@ -882,12 +931,7 @@ function validateFieldDefinition( $fieldDefinition, $type )
 				}
 				break;
 			case 'taxonomy_term_reference' :
-				if ( $fieldDefinition['widget_type'] == 'taxonomy_autocomplete' && $fieldDefinition['cardinality'] != -1 ) {
-					$errors[] = createError( $fieldName ,
-						'Cardinality has to be unlimited for fields of type "'.$fieldDefinition['type'].'" with widget "' . $fieldDefinition['widget_type'] . '".  Encountered '
-						. 'cardinality: \'' . $fieldDefinition['cardinality'] . '\'. ' . $requiredFieldMessage,
-						$contentType, $severity );
-				}
+				// Term references may have any cardinality.
 				break;
 			default : // Invalid so do nothing.
 				$errors[] = createError( $fieldName, 'Unsupported Field and Field type combination for: Type: \''
@@ -919,7 +963,7 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 		case 'options_buttons' :
 		case 'options_select' :
 			$propertyInfoType = 'list';
-			if ( in_array( $fieldInfoType, array( 'list_float', 'list_integer', 'list_string', 'taxonomy_term_reference' ) )
+			if ( in_array( $fieldInfoType, array( 'list_float', 'list_integer', 'list_string', 'entity_reference' ) )
 				&& $cardinality != 1
 			) {
 				$propertyInfoType = 'multilist';
@@ -940,6 +984,9 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 		case 'image_image' :
 			$propertyInfoType = 'fileselector';
 			break;
+		case 'email_default' :
+			$propertyInfoType = 'string';
+			break;
 		case 'string_textfield' : // Text (plain)
 			$propertyInfoType = ( $hasTextFilter ) ? 'articlecomponentselector' : 'string';
 			break;
@@ -948,7 +995,9 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 		case 'text_textarea_with_summary': // Text (formatted, long, summary)
 			$propertyInfoType = ( $hasTextFilter ) ? 'articlecomponentselector' : 'multiline';
 			break;
-		case 'taxonomy_autocomplete' :
+		case 'entity_reference_autocomplete' :
+		case 'entity_reference_autocomplete_tags' :
+			// @todo Is this the correct behavior for non-tags autocomplete?
 			$propertyInfoType = 'multistring';
 			break;
 		case 'datetime_default' :
@@ -960,6 +1009,9 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 					$propertyInfoType = 'date';
 					break;
 			}
+			break;
+		case 'comment_default' :
+			$propertyInfoType = 'list';
 			break;
 		default :
 			$propertyInfoType = null;
@@ -1011,12 +1063,12 @@ function deleteExpiredPreviews()
  */
 function checkFilters()
 {
-	// Determine if there is a filter for 'full_html', that it is enabled, and that it is for HTML.
-	/** @var \Drupal\filter\FilterFormatInterface $filter */
-	$filter = entity_load( 'filter_format', 'full_html' );
+	// Determine if there is a default filter, that it is enabled, and that it is for HTML.
+	$default_filter_format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
+	$filter = FilterFormat::load( $default_filter_format );
 
 	if ( !$filter || !$filter->status() ){
-		throw new \Exception( 'The mandatory Drupal text format "full_html" is either missing or disabled. Please ' .
+		throw new \Exception( 'The mandatory Drupal text format "' . $default_filter_format . '" (set by ww_enterprise.settings:default_filter_format) is either missing or disabled. Please ' .
 			'ensure that the format exists and is not disabled.' );
 	}
 }
@@ -1092,7 +1144,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 
 			if ( !is_null( $field_machine_name ) ) {
 				$val = null;
-				$fieldType = $node->$field_machine_name->getFieldDefinition()->field_type;
+				$fieldType = $node->$field_machine_name->getFieldDefinition()->getType();
 				switch ( $fieldType ) {
 					case 'boolean' :
 						$val = intval( $values[0] );
@@ -1114,18 +1166,17 @@ function mapNodeValues( $node, $formValues, $previewMode )
 					case 'list_float':
 					case 'list_integer':
 					case 'list_string':
-						$listOptions = $node->$field_machine_name->getFieldDefinition()->getSetting( 'allowed_values' );
-
+						$listOptions = options_allowed_values( $node->$field_machine_name->getFieldDefinition()->getFieldStorageDefinition(), null);
 						$val = ''; // This is when user selected '- None -'.
 						$listValuesCount = count( $formValues[$key] );
 
-						if( $listValuesCount == 1 ) { // When cardinatlity is 1
+						if( $listValuesCount == 1 ) { // When cardinality is 1
 							if( in_array( $formValues[$key][0], $listOptions ) ) {
-								// When cardinatlity = 1, only return the label's key.
+								// When cardinality = 1, only return the label's key.
 								$val = array_search( $formValues[$key][0], $listOptions ); // Getting the label's key.
 							}
-						} else if( $listValuesCount > 1 ) {  // When cardinatlity is > 1
-							$val = array(); // When cardinatlity > 1, should return as a list of labels' keys.
+						} else if( $listValuesCount > 1 ) {  // When cardinality is > 1
+							$val = array(); // When cardinality > 1, should return as a list of labels' keys.
 							if( $formValues[$key] ) foreach( $formValues[$key] as $listValue ) {
 								if( in_array( $listValue, $listOptions ) ) {
 									$val[] = array_search( $listValue, $listOptions ); // Collecting the labels' corresponding key.
@@ -1134,6 +1185,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						}
 						$node->$field_machine_name = $val;
 						break;
+					case 'email': // email.
 					case 'string': // text (plain)
 					case 'string_long': // text (plain, long)
 						$val = ( isset( $values[0] ) ) ? $values[0] : null;
@@ -1144,9 +1196,10 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						$attachments = ( isset( $values[0]['attachments'] ) ) ? $values[0]['attachments'] : null;
 						$val = resolveInlineImages( $content, $attachments );
 						$node->$field_machine_name->value = $val;
-						$node->$field_machine_name->format = 'full_html';
+						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
 					case 'text_with_summary': // text (formatted, long, summary)
+						// Long text summary
 						$content = null;
 						if( isset( $values[0]['elements'] ) ) { // Happens when only 'body' is filled in.
 							$content = $values[0]['elements'];
@@ -1170,9 +1223,10 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						$summaryContent = resolveInlineImages( $content, $attachments );
 						$node->$field_machine_name->summary = $summaryContent;
 
-						$node->$field_machine_name->format = 'full_html';
+						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
-					case 'taxonomy_term_reference': //
+					case 'entity_reference': //
+						// @todo Expand to support all kinds of references.
 						$termIds = array();
 						foreach ( $values as $value ) {
 							if ($value != '') {
@@ -1182,7 +1236,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 									$termIds[] = key( $taxonomyEntityTerm );
 								} else { // Not yet exists, user has just entered new one.
 									// Save into Drupal database.
-									$fieldSetting = $node->$field_machine_name->getFieldDefinition()->getFieldStorageDefinition()->getSetting( 'allowed_values' );
+									$fieldSetting = options_allowed_values( $node->$field_machine_name->getFieldDefinition()->getFieldStorageDefinition(), null );
 									$fieldVocabulary = $fieldSetting[0]['vocabulary'];
 									$taxonomyEntityTerm = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->create(array(
 										'vid' => $fieldVocabulary,
@@ -1248,7 +1302,7 @@ function mapNodeValues( $node, $formValues, $previewMode )
 							}
 
 							// Only add the description if the field is enabled.
-							if ( $node->$field_machine_name->getSetting( 'description_field' ) ) {
+							if ( $node->$field_machine_name->getSetting( 'description_field' ) && isset( $value['description'] ) ) {
 								$val['description'] = $value['description'];
 							}
 
@@ -1256,6 +1310,11 @@ function mapNodeValues( $node, $formValues, $previewMode )
 							$i++;
 						}
 						$node->$field_machine_name = $newValues;
+						break;
+					case 'comment' :
+						$listOptions = array( 'Hidden' => 0, 'Closed' => 1, 'Open' => 2 );
+						$val = $listOptions[$formValues[$key][0]];
+						$node->$field_machine_name = $val;
 						break;
 					default:
 						throw new Exception ( 'Unknown field type "' . $fieldType . '" for field "'.$field_machine_name.'".' );
