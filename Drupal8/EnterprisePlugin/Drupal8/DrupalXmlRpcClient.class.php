@@ -41,7 +41,8 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	public function __construct( $publishTarget )
 	{
 		$this->resolveChannelData( $publishTarget );
-		$httpClient = $this->createHttpClient( $this->url . 'xmlrpc.php', $this->certificate);
+		// xmlrpc.php file has been removed in Drupal 8, now should call xmlrpc module instead.
+		$httpClient = $this->createHttpClient( $this->url . 'xmlrpc', $this->certificate);
 		$httpClient->setHeaders('Authorization', $this->authentication);
 		parent::__construct($this->url, $httpClient);
 	}
@@ -100,6 +101,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 
 		// Prevent timeout errors for heavy calls.
 		$httpClient->setConfig(array('timeout' => 3600));
+//		$httpClient->setCookie(array( 'XDEBUG_SESSION' => <XDEBUG Session Key> )); // To enable debugging of the Drupal site.
 
 		return $httpClient;
 	}
@@ -217,7 +219,7 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 			}
 		} else {
 			$result['Version'][] = 'The version of the Drupal module could not be obtained. '
-					. 'This indicates that an old Drupal module is installed. Please install the latest Drupal module.';
+				. 'This indicates that an old Drupal module is installed. Please install the latest Drupal module.';
 		}
 
 		return $result;
@@ -250,19 +252,19 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 
 		$valueArray = $this->callRpcService( 'enterprise.saveNode'
 			, array(
-			       array(
-				       'ID' => $dossier->MetaData->BasicMetaData->ID,
-				       'Name' => $dossier->MetaData->BasicMetaData->Name,
-				       'Category' => $dossier->MetaData->BasicMetaData->Category->Name,
-				       'Description' => $dossier->MetaData->ContentMetaData->Description,
-				       'Action' => $action,
-				       'Preview' => $preview,
-				       'ExternalId' => $externalId,
-					   'Username' => BizSession::getShortUserName()
-			       ),
-			       $values,
-			       $attachments,
-			  )
+				array(
+					'ID' => $dossier->MetaData->BasicMetaData->ID,
+					'Name' => $dossier->MetaData->BasicMetaData->Name,
+					'Category' => $dossier->MetaData->BasicMetaData->Category->Name,
+					'Description' => $dossier->MetaData->ContentMetaData->Description,
+					'Action' => $action,
+					'Preview' => $preview,
+					'ExternalId' => $externalId,
+					'Username' => BizSession::getShortUserName()
+				),
+				$values,
+				$attachments,
+			)
 		);
 		return $valueArray;
 	}
@@ -296,8 +298,8 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 
 		$result = $this->callRpcService( 'enterprise.removeNode',
 			array(
-		        intval( $dossier->ExternalId ),
-		    )
+				intval( $dossier->ExternalId ),
+			)
 		);
 		return $result;
 	}
@@ -456,20 +458,20 @@ class DrupalXmlRpcClient extends WW_Utils_XmlRpcClient
 	 * @param $dossier
 	 * @return mixed
 	 */
-    public function getFileId($filename, $contentType, $publishedVersion, $dossier)
-    {
-	    $response = $this->callRpcService( 'enterprise.getFileId',
-		    array(
-		         array(
-			         'filename'    => $filename,
-			         'contentType' => $contentType,
-			         'version'     => $publishedVersion,
-			         'nodeId'      => intval( $dossier->ExternalId )
-		         )
-		    )
-	    );
-	    return $response;
-    }
+	public function getFileId($filename, $contentType, $publishedVersion, $dossier)
+	{
+		$response = $this->callRpcService( 'enterprise.getFileId',
+			array(
+				array(
+					'filename'    => $filename,
+					'contentType' => $contentType,
+					'version'     => $publishedVersion,
+					'nodeId'      => intval( $dossier->ExternalId )
+				)
+			)
+		);
+		return $response;
+	}
 
 	/**
 	 * Retrieves a vocabulary based on the vocabulary ID.
