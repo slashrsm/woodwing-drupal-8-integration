@@ -35,8 +35,14 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 		// Retrieve the PubChannelInfos
 		require_once BASEDIR.'/server/bizclasses/BizAdmPublication.class.php';
 		require_once dirname(__FILE__).'/DrupalField.class.php';
-
-		$pubChannelInfos = BizAdmPublication::getPubChannelInfosForPublishSystem( 'Drupal8' );
+		require_once dirname(__FILE__).'/webapps/Drupal8_ImportDefinitions_EnterpriseWebApp.class.php';
+		$context = Drupal8_ImportDefinitions_EnterpriseWebApp::getContext();
+		if ( !is_null( $context ) ) {
+			$pubChannelInfos = $context;
+			Drupal8_ImportDefinitions_EnterpriseWebApp::resetContext(); // Make sure the Web App context is not used in another process.
+		} else {
+			$pubChannelInfos = BizAdmPublication::getPubChannelInfosForPublishSystem( 'Drupal8' );
+		}
 
 		foreach ($pubChannelInfos as $pubChannelInfo) {
 			$templates = self::getTemplatesFromDB($pubChannelInfo->Id);
@@ -61,7 +67,7 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 						$errors = array();
 						// Create a new DrupalField and get any errors from the field generation.
 						$drupalField = DrupalField::generateFromDrupalFieldDefinition($field, $templateId,
-		                    $pubChannelInfo->Id, $contentType);
+							$pubChannelInfo->Id, $contentType);
 						$errors = array_merge($errors, $drupalField->getErrors());
 
 						// Attempt to create a propertyInfo, and get any errors.
@@ -89,7 +95,7 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 				if (is_array($fields) && isset( $fields['basic_fields'])) {
 					$drupalField = new DrupalField();
 					$propertyInfos = $drupalField->getSpecialPropertyInfos($templateId, $fields['basic_fields'],
-							$pubChannelInfo->Id, $contentType );
+						$pubChannelInfo->Id, $contentType );
 
 					if ( $drupalField->hasError() ) {
 						$errors = array_merge( $errors, $drupalField->getErrors() );
@@ -99,7 +105,7 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 							$props[0]['PublishForm'][] = $propertyInfo;
 						}
 					}
-			    }
+				}
 			}
 		}
 		return $props;
@@ -108,7 +114,7 @@ class Drupal8_CustomObjectMetaData extends CustomObjectMetaData_EnterpriseConnec
 	/**
 	 * Retrieves all field definitions made at Drupal (for all content types).
 	 *
-     * @param PubChannelInfo $pubChannelInfo
+	 * @param PubChannelInfo $pubChannelInfo
 	 * @param null|string $contentType The ContentType for which to get the Fields. Default: NULL
 	 * @return array List of field definitions.
 	 */
