@@ -1236,10 +1236,11 @@ function mapNodeValues( $node, $formValues, $previewMode )
 									$termIds[] = key( $taxonomyEntityTerm );
 								} else { // Not yet exists, user has just entered new one.
 									// Save into Drupal database.
-									$fieldSetting = options_allowed_values( $node->$field_machine_name->getFieldDefinition()->getFieldStorageDefinition(), null );
-									$fieldVocabulary = $fieldSetting[0]['vocabulary'];
+									$fieldDefinition = $node->$field_machine_name->getFieldDefinition();
+									$fieldItemSettings = $fieldDefinition->getItemDefinition()->getSettings();
+									$vocabulary = array_pop( $fieldItemSettings['handler_settings']['target_bundles'] );
 									$taxonomyEntityTerm = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->create(array(
-										'vid' => $fieldVocabulary,
+										'vid' => $vocabulary,
 										'name' => $value
 									));
 									$taxonomyEntityTerm->save();
