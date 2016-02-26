@@ -20,7 +20,7 @@ class Drupal8_EnterprisePlugin extends EnterprisePlugin
 	public function getPluginInfo()
 	{
 		$info = new PluginInfoData();
-		$info->DisplayName = 'Drupal 8';
+		$info->DisplayName = 'Drupal 8 - Publish Forms';
 		$info->Version     = '9.9.0 Build 1063'; // don't use PRODUCTVERSION.
 		$info->Description = 'Publishing service for Drupal 8.';
 		$info->Copyright   = COPYRIGHT_WOODWING;
