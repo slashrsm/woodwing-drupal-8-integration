@@ -572,9 +572,22 @@ function ww_enterprise_xmlrpc_getUrl( $nodeId )
 	return getNodeURL( intval($nodeId), false );
 }
 
-
-
-function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$termField,$searchValue)
+/**
+ * Entity autocomplete XML-RPC method.
+ *
+ * @param string $contentType
+ *   The node type.
+ * @param string $field_id
+ *   The field name.
+ * @param string $searchValue
+ *   The autocomplete string to search for.
+ *
+ * @return string[]
+ *   A list of suggestions.
+ *
+ * @throws \Exception
+ */
+function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$field_id,$searchValue)
 {
 	// Authenticate the request.
 	$user = validateRequest( \Drupal::request() );
@@ -583,12 +596,14 @@ function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$termField,$searc
 		throw new \Exception( 'Could not authenticate the user.' );
 	}
 	
-	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $contentType .'] termField[' . $termField . '] searchValue[' . $searchValue . ']');
+	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $contentType .'] termField[' . $field_id . '] searchValue[' . $searchValue . ']');
 
 
 	/** @var \Drupal\Core\Field\FieldDefinitionInterface $field_definition */
 	$field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', $contentType);
-	$field_definition = $field_definitions[$termField];
+
+	$field_name = retrieveMachineName($field_id);
+	$field_definition = $field_definitions[$field_name];
 
 	$options = array(
 		'target_type' => $field_definition->getSetting('target_type'),
