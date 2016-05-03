@@ -1330,7 +1330,7 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 							if ($value != '') {
 								// Only existing references are supported, match for
 								// (entity_type:id) in the value.
-								if (preg_match("/.+\s\(([\w.])+:(\d+)\)/", $value, $matches)) {
+								if (preg_match("/.+\s\(([\w.]+):(\d+)\)/", $value, $matches)) {
 									$entities[] = [
 										'target_type' => $matches[1],
 										'target_id' => $matches[2],
