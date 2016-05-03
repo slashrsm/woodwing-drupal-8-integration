@@ -1322,7 +1322,25 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 
 					case 'dynamic_entity_reference':
 
-						
+						\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
+
+						// @todo Expand to support all kinds of references.
+						$entities = array();
+						foreach ( $values as $value ) {
+							if ($value != '') {
+								// Only existing references are supported, match for
+								// (entity_type:id) in the value.
+								if (preg_match("/.+\s\([\w.]+:(\d+)\)/", $value, $matches)) {
+									$entities[] = [
+										'target_type' => $matches[1],
+										'target_id' => $matches[2],
+									];
+								}
+							}
+						}
+						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($entities, TRUE));
+
+						$node->$field_machine_name = $entities;
 						break;
 
 					case 'image':
