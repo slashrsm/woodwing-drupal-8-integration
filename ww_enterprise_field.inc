@@ -547,7 +547,7 @@ function getEnterpriseNodeFields( $contentType )
 			}
 			
 			// Support all other entity reference fields in a generic way.
-			elseif (in_array($nodeProperties['type'], ['entity_reference', 'dynamic_entity_reference', 'simplenews_issue']) {
+			elseif (in_array($nodeProperties['type'], ['entity_reference', 'dynamic_entity_reference', 'simplenews_issue'])) {
 				$nodeProperties['vocabulary_name'] = 'entityreference';
 				$nodeProperties['type'] = 'entity_term_reference';
 				$nodeProperties['ww_term_entity'] = NULL;
