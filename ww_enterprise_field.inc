@@ -553,7 +553,6 @@ function getEnterpriseNodeFields( $contentType )
 				$nodeProperties['ww_term_entity'] = NULL;
 			}
 
-
 			// This is only executed if we were able to detect the referenced
 			// vocabulary above.
 			if ( $nodeProperties['type'] == 'taxonomy_term_reference') {

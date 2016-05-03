@@ -665,6 +665,7 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 			break;
 
 		default:
-			throw new \Exception('Unsuported field ' . $field_name . ' (' . $field_definition->getType() . ')')
+			throw new \Exception('Unsuported field ' . $field_name . ' (' . $field_definition->getType() . ')');
+			break;
 	}
 }
