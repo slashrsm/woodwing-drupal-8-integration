@@ -635,7 +635,7 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 		// Loop through the entities and convert them into autocomplete output.
 		foreach ($entity_labels as $values) {
 			foreach ($values as $entity_id => $label) {
-				$result[$entity_id] = $label;
+				$result[$entity_id] = $label . ' (' . $entity_id . ')';
 			}
 		}
 	}

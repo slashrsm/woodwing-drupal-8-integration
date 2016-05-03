@@ -1,8 +1,11 @@
 <?php
+use Drupal\Core\Entity\Element\EntityAutocomplete;
+use Drupal\Core\Entity\EntityReferenceSelection\SelectionWithAutocreateInterface;
 use Drupal\Core\Form\OptGroup;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\filter\Entity\FilterFormat;
+use Drupal\node\NodeInterface;
 use Drupal\user\UserInterface;
 
 /**
@@ -1127,11 +1130,11 @@ function resolveInlineImages( $content, $attachments )
 /**
  * Map all fields's values from Publish Form into Drupal node's values.
  *
- * @param Object $node The node to map the values for.
+ * @param \Drupal\node\NodeInterface $node The node to map the values for.
  * @param array $formValues The form values.
  * @param bool $previewMode Whether a preview is generated or not.
  */
-function mapNodeValues( $node, $formValues, $previewMode )
+function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 {
 	// Get the custom fields and set them on the node.
 	$basicProperties = array(
@@ -1244,31 +1247,75 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
 
 						// @todo Expand to support all kinds of references.
-						$termIds = array();
+						$entity_ids = array();
 						foreach ( $values as $value ) {
 							if ($value != '') {
-								$taxonomyEntityTerm = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->loadByProperties( array( 'name' => $value ) );
-								if ( count( $taxonomyEntityTerm ) > 0) { // Existing record, terms already exist in Drupal Database.
-									// So only retrieve them.
-									$termIds[] = key( $taxonomyEntityTerm );
-								} else { // Not yet exists, user has just entered new one.
-									// Save into Drupal database.
-									$fieldDefinition = $node->$field_machine_name->getFieldDefinition();
-									$fieldItemSettings = $fieldDefinition->getItemDefinition()->getSettings();
-									$vocabulary = array_pop( $fieldItemSettings['handler_settings']['target_bundles'] );
-									$taxonomyEntityTerm = \Drupal::entityManager()->getStorage( 'taxonomy_term' )->create(array(
-										'vid' => $vocabulary,
-										'name' => $value
-									));
-									$taxonomyEntityTerm->save();
-									$termIds[] = $taxonomyEntityTerm->id();
+
+								$field_definition = $node->getFieldDefinition($field_machine_name);
+
+								$options = array(
+									'target_type' => $field_definition->getSetting('target_type'),
+									'handler' => $field_definition->getSetting('handler'),
+									'handler_settings' => $field_definition->getSetting('handler_settings'),
+								);
+
+								/** @var /Drupal\Core\Entity\EntityReferenceSelection\SelectionInterface $handler */
+								$handler = \Drupal::service('plugin.manager.entity_reference_selection')->getInstance($options);
+
+								$autocreate = FALSE;
+								$autocreate_bundle = NULL;
+								if (!empty($field_definition->getSetting('handler_settings')['auto_create']) && $handler instanceof SelectionWithAutocreateInterface) {
+									$autocreate = TRUE;
+									if ($target_bundles = $field_definition->getSetting('handler_settings')['target_bundles']) {
+										// If there's only one target bundle, use it.
+										if (count($target_bundles) == 1) {
+											$autocreate_bundle = reset($target_bundles);
+										}
+										// Otherwise use the target bundle stored in selection handler settings.
+										elseif (!$autocreate_bundle = $field_definition->getSetting('handler_settings')['auto_create_bundle']) {
+											// If no bundle has been set as auto create target means that there is
+											// an inconsistency in entity reference field settings.
+											trigger_error(
+												sprintf(
+													"The 'Create referenced entities if they don't already exist' option is enabled but a specific destination bundle is not set. You should re-visit and fix the settings of the '%s' (%s) field.",
+													$this->fieldDefinition->getLabel(),
+													$this->fieldDefinition->getName()
+												), E_USER_WARNING
+											);
+										}
+									}
+								}
+								$match = EntityAutocomplete::extractEntityIdFromAutocompleteInput($value);
+								if ($match === NULL) {
+
+									$entities_by_bundle = $handler->getReferenceableEntities($value, '=', 6);
+									$entities = array_reduce($entities_by_bundle, function ($flattened, $bundle_entities) {
+										return $flattened + $bundle_entities;
+									}, []);
+
+									if (count($entities) == 1) {
+										$entity_ids[] = key($entities);
+									}
+									elseif ($autocreate) {
+										// Auto-create item. See an example of how this is handled in
+										// \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::presave().
+										$new_entity = $handler->createNewEntity($options['target_type'], $autocreate_bundle, $value, \Drupal::currentUser()->id());
+										$new_entity->save();
+										$entity_ids[] = $new_entity->id();
+									}
+									else {
+										\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
+									}
+								}
+								else {
+									$entity_ids[] = $match;
 								}
 							}
 						}
 
 						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($values, TRUE));
 
-						$node->$field_machine_name = $termIds;
+						$node->$field_machine_name = $entity_ids;
 						break;
 					case 'image':
 						$val = null;
