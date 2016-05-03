@@ -651,7 +651,7 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 
 				// Get an array of matching entities.
 				$match_operator = !empty($selection_settings['match_operator']) ? $selection_settings['match_operator'] : 'CONTAINS';
-				$entity_labels = $handler->getReferenceableEntities($searchValue, $match_operator, 10);
+				$entity_labels = $handler->getReferenceableEntities($searchValue, $match_operator, 4);
 				$entity_type_label = \Drupal::entityTypeManager()->getDefinition($target_type)->getLabel();
 				// Loop through the entities and convert them into autocomplete output.
 				foreach ($entity_labels as $values) {

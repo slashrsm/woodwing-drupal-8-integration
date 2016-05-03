@@ -473,6 +473,7 @@ function getEnterpriseNodeFields( $contentType )
 				'email_default',
 				'number',
 				'entity_reference_autocomplete',
+				'dynamic_entity_reference_default'
 			);
 
             \Drupal::logger( 'ww_enterprise' )->warning( $nodeProperties['name'] . ' ' . print_r($nodeProperties,1) );
@@ -1018,6 +1019,7 @@ function getEnterprisePropertyInfoType( $widgetType, $fieldInfoType, $cardinalit
 			break;
 		case 'entity_reference_autocomplete' :
 		case 'entity_reference_autocomplete_tags' :
+		case 'dynamic_entity_reference_default' :
 			// @todo Is this the correct behavior for non-tags autocomplete?
 			$propertyInfoType = 'multistring';
 			break;
