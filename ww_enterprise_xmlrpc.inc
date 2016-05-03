@@ -596,8 +596,6 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 		throw new \Exception( 'Could not authenticate the user.' );
 	}
 	
-	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $type_uuid .'] termField[' . $field_id . '] searchValue[' . $searchValue . ']');
-
 	$node_type = \Drupal::service('entity.repository')->loadEntityByUuid('node_type', $type_uuid);
 	if (!$node_type) {
 		throw new \Exception( 'Unknown content type: ' . $type_uuid );
@@ -626,8 +624,6 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 		'handler_settings' => $field_definition->getSetting('handler_settings'),
 	);
 
-	\Drupal::logger( 'ww_enterprise' )->warning('search_options: ' . print_r($options, TRUE));
-
 	$handler = \Drupal::service('plugin.manager.entity_reference_selection')->getInstance($options);
 
 	$result = [];
@@ -644,7 +640,6 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 		}
 	}
 
-	\Drupal::logger( 'ww_enterprise' )->warning('result: ' . print_r($result, TRUE));
 
 	return $result;
 }

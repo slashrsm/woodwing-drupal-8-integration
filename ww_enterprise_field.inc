@@ -1240,6 +1240,9 @@ function mapNodeValues( $node, $formValues, $previewMode )
 						$node->$field_machine_name->format = \Drupal::config('ww_enterprise.settings')->get('default_filter_format');
 						break;
 					case 'entity_reference': //
+
+						\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
+
 						// @todo Expand to support all kinds of references.
 						$termIds = array();
 						foreach ( $values as $value ) {
@@ -1262,6 +1265,9 @@ function mapNodeValues( $node, $formValues, $previewMode )
 								}
 							}
 						}
+
+						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($values, TRUE));
+
 						$node->$field_machine_name = $termIds;
 						break;
 					case 'image':
