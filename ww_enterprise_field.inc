@@ -469,8 +469,10 @@ function getEnterpriseNodeFields( $contentType )
 				'text_textarea_with_summary',
 				'email_default',
 				'number',
+				'entity_reference_autocomplete',
 			);
 
+            \Drupal::logger( 'ww_enterprise' )->warning( $nodeProperties['name'] . ' ' . print_r($nodeProperties,1) );
 			if ( !in_array( $nodeProperties['widget_type'], $knownWidgets ) ) {
 				// Attempt to read out the default field type.
 				$defaultTypeInfo = \Drupal::service('plugin.manager.field.field_type')->getDefinition($nodeProperties['type']);
@@ -518,6 +520,7 @@ function getEnterpriseNodeFields( $contentType )
 			}
 
 			// @todo Temporary limit support for entity references to term references.
+			\Drupal::logger( 'ww_enterprise' )->warning('target_type:' . $field->getFieldStorageDefinition()->getSetting('target_type') );
 			if ($nodeProperties['type'] == 'entity_reference' && $field->getFieldStorageDefinition()->getSetting('target_type') == 'taxonomy_term') {
 
 				$handlerSettings = $field->getSetting('handler_settings');
@@ -540,6 +543,20 @@ function getEnterpriseNodeFields( $contentType )
 					$nodeProperties['ww_term_entity'] = (!empty($storedTermEntity)) ? $storedTermEntity : null;
 				}
 			}
+			
+			
+			// WVR:
+			$validEntityReferences = array('node');
+			if ($nodeProperties['type'] == 'entity_reference' && 
+			    in_array($field->getFieldStorageDefinition()->getSetting('target_type'),$validEntityReferences) ) {
+
+				$nodeProperties['vocabulary_name'] = 'entityreference';
+				$nodeProperties['type'] = 'entity_term_reference';
+				$nodeProperties['ww_term_entity'] = null;
+
+   			}
+	        // WVR:END		
+			
 
 			// This is only executed if we were able to detect the referenced
 			// vocabulary above.
@@ -933,6 +950,9 @@ function validateFieldDefinition( &$fieldDefinition, $type, &$warnOnly=false )
 			case 'taxonomy_term_reference' :
 				// Term references may have any cardinality.
 				break;
+			case 'entity_term_reference' :
+				// Term references may have any cardinality.
+				break;	
 			default : // Invalid so do nothing.
 				$errors[] = createError( $fieldName, 'Unsupported Field and Field type combination for: Type: \''
 					. $fieldDefinition['type'] . '\', Field: \'' . $fieldDefinition['widget_type'] . '\'. '  . $requiredFieldMessage,

@@ -86,6 +86,19 @@ function ww_enterprise_xmlrpc()
 		t('Retrieves a specific vocabulary based on the vid.'),
 	);
 
+    $xmlrpc[] = array(
+		'enterprise.getTermEntityValues',
+		'ww_enterprise_xmlrpc_getTermEntityValues',
+		array(
+			'struct', // Return value.
+			'string', // contentType
+			'string', // termField.
+			'string', // searchValue.
+		),
+		t('Retrieves a specific vocabulary based on the vid.'),
+	);
+
+
 	return $xmlrpc;
 }
 
@@ -222,6 +235,14 @@ function ww_enterprise_xmlrpc_getVocabularyNames( $params, $testmode=false )
 			);
 		}
 
+        //wvr: add entityreference as 'known' vocu so Enterprise thinks this exists
+        $result['FAKEUID'] = array(
+				'uuid' => 'FAKEUID',
+				'vid' => 'FAKEUIDALSO',
+				'name' => 'entityreference',
+				'ww_term_entity' => 0
+			);
+        
 		// Add the Drupal database instance id to the response.
 		$result['DrupalDatabaseInstanceId'] = \Drupal::config( 'system.site' )->get( 'uuid' );
 
@@ -549,4 +570,20 @@ function ww_enterprise_xmlrpc_getUrl( $nodeId )
 	}
 
 	return getNodeURL( intval($nodeId), false );
+}
+
+
+
+function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$termField,$searchValue)
+{
+	// Authenticate the request.
+	$user = validateRequest( \Drupal::request() );
+	if ( is_null( $user ) ) {
+		\Drupal::logger( 'ww_enterprise' )->debug( 'Could not authenticate the user.' );
+		throw new \Exception( 'Could not authenticate the user.' );
+	}
+	
+	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $contentType .'] termField[' . $termField . '] searchValue[' . $searchValue . ']');
+	$result = array('1' => 'Milk');
+	return $result;
 }
