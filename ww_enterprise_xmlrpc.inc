@@ -584,6 +584,35 @@ function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$termField,$searc
 	}
 	
 	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $contentType .'] termField[' . $termField . '] searchValue[' . $searchValue . ']');
-	$result = array('1' => 'Milk');
+
+
+	/** @var \Drupal\Core\Field\FieldDefinitionInterface $field_definition */
+	$field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', $contentType);
+	$field_definition = $field_definitions[$termField];
+
+	$options = array(
+		'target_type' => $field_definition->getSetting('target_type'),
+		'handler' => $field_definition->getSetting('handler'),
+		'handler_settings' => $field_definition->getSetting('handler_settings'),
+	);
+
+	\Drupal::logger( 'ww_enterprise' )->warning('search_options', print_r($options, TRUE));
+
+	$handler = \Drupal::service('plugin.manager.entity_reference_selection')->getInstance($options);
+
+	$result = [];
+	if (isset($searchValue)) {
+		// Get an array of matching entities.
+		$match_operator = !empty($selection_settings['match_operator']) ? $selection_settings['match_operator'] : 'CONTAINS';
+		$entity_labels = $handler->getReferenceableEntities($searchValue, $match_operator, 10);
+
+		// Loop through the entities and convert them into autocomplete output.
+		foreach ($entity_labels as $values) {
+			foreach ($values as $entity_id => $label) {
+				$result[$entity_id] = $label;
+			}
+		}
+	}
+
 	return $result;
 }
