@@ -614,5 +614,7 @@ function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$termField,$searc
 		}
 	}
 
+	\Drupal::logger( 'ww_enterprise' )->warning('response', print_r($result, TRUE));
+
 	return $result;
 }
