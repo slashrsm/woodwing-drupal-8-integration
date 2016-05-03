@@ -1189,8 +1189,6 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 					case 'list_integer':
 					case 'list_string':
 
-					  \Drupal::logger( 'ww_enterprise' )->warning("values for list $field_machine_name: " . print_r($values, TRUE));
-
 						$listOptions = options_allowed_values( $node->$field_machine_name->getFieldDefinition()->getFieldStorageDefinition(), null);
 						$val = ''; // This is when user selected '- None -'.
 						$listValuesCount = count( $formValues[$key] );
@@ -1252,9 +1250,6 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 						break;
 					case 'entity_reference': //
 
-						\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
-
-						// @todo Expand to support all kinds of references.
 						$entity_ids = array();
 						foreach ( $values as $value ) {
 							if ($value != '') {
@@ -1315,16 +1310,10 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 							}
 						}
 
-						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($entity_ids, TRUE));
-
 						$node->$field_machine_name = $entity_ids;
 						break;
 
 					case 'dynamic_entity_reference':
-
-						\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
-
-						// @todo Expand to support all kinds of references.
 						$entities = array();
 						foreach ( $values as $value ) {
 							if ($value != '') {
@@ -1338,8 +1327,6 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 								}
 							}
 						}
-						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($entities, TRUE));
-
 						$node->$field_machine_name = $entities;
 						break;
 
