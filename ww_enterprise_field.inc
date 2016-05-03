@@ -544,19 +544,13 @@ function getEnterpriseNodeFields( $contentType )
 				}
 			}
 			
-			
-			// WVR:
-			$validEntityReferences = array('node');
-			if ($nodeProperties['type'] == 'entity_reference' && 
-			    in_array($field->getFieldStorageDefinition()->getSetting('target_type'),$validEntityReferences) ) {
-
+			// Support all other entity reference fields in a generic way.
+			elseif ($nodeProperties['type'] == 'entity_reference') {
 				$nodeProperties['vocabulary_name'] = 'entityreference';
 				$nodeProperties['type'] = 'entity_term_reference';
-				$nodeProperties['ww_term_entity'] = null;
+				$nodeProperties['ww_term_entity'] = NULL;
+			}
 
-   			}
-	        // WVR:END		
-			
 
 			// This is only executed if we were able to detect the referenced
 			// vocabulary above.
