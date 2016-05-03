@@ -88,7 +88,7 @@ function ww_enterprise_xmlrpc()
 
     $xmlrpc[] = array(
 		'enterprise.getTermEntityValues',
-		'ww_enterprise_xmlrpc_getTermEntityValues',
+		'ww_enterprise_xmlrpc_getEntityValues',
 		array(
 			'struct', // Return value.
 			'string', // contentType
@@ -575,7 +575,7 @@ function ww_enterprise_xmlrpc_getUrl( $nodeId )
 /**
  * Entity autocomplete XML-RPC method.
  *
- * @param string $contentType
+ * @param string $type_uuid
  *   The node type.
  * @param string $field_id
  *   The field name.
@@ -587,7 +587,7 @@ function ww_enterprise_xmlrpc_getUrl( $nodeId )
  *
  * @throws \Exception
  */
-function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$field_id,$searchValue)
+function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValue)
 {
 	// Authenticate the request.
 	$user = validateRequest( \Drupal::request() );
@@ -596,13 +596,28 @@ function ww_enterprise_xmlrpc_getTermEntityValues($contentType,$field_id,$search
 		throw new \Exception( 'Could not authenticate the user.' );
 	}
 	
-	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $contentType .'] termField[' . $field_id . '] searchValue[' . $searchValue . ']');
+	\Drupal::logger( 'ww_enterprise' )->warning('contentType[' . $type_uuid .'] termField[' . $field_id . '] searchValue[' . $searchValue . ']');
 
+	$node_type = \Drupal::service('entity.repository')->loadEntityByUuid('node_type', $type_uuid);
+	if (!$node_type) {
+		throw new \Exception( 'Unknown content type: ' . $type_uuid );
+	}
 
 	/** @var \Drupal\Core\Field\FieldDefinitionInterface $field_definition */
-	$field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', $contentType);
+	$field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', $node_type->id());
 
 	$field_name = retrieveMachineName($field_id);
+
+	if (empty($field_name)) {
+		throw new \Exception( 'Unknown field ID: ' . $field_id );
+	}
+
+	if (!isset($field_definitions[$field_name])) {
+		if (empty($field_name)) {
+			throw new \Exception( 'Field ' . $field_name . ' (' . $field_id . ') not known on node type ' . $node_type->id() );
+		}
+	}
+
 	$field_definition = $field_definitions[$field_name];
 
 	$options = array(
