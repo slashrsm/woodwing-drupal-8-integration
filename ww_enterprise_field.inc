@@ -653,7 +653,7 @@ function getEnterpriseNodeFields( $contentType )
 				$nodeProperties['min_value'] = ( empty( $min_value ) ) ?  '-' . $value : $min_value;
 				$nodeProperties['max_value'] = ( empty( $max_value ) ) ? $value : $max_value;
 
-				$nodeProperties['default_value'] = ( $nodeProperties['default_value'][0]['value'] )
+				$nodeProperties['default_value'] = isset( $nodeProperties['default_value'][0]['value'] )
 					? ( $nodeProperties['default_value'][0]['value'] )
 					: null;
 			} elseif ( $nodeProperties['type'] == 'integer') {
@@ -1261,14 +1261,8 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 
 								$field_definition = $node->getFieldDefinition($field_machine_name);
 
-								$options = array(
-									'target_type' => $field_definition->getSetting('target_type'),
-									'handler' => $field_definition->getSetting('handler'),
-									'handler_settings' => $field_definition->getSetting('handler_settings'),
-								);
-
 								/** @var /Drupal\Core\Entity\EntityReferenceSelection\SelectionInterface $handler */
-								$handler = \Drupal::service('plugin.manager.entity_reference_selection')->getInstance($options);
+								$handler = \Drupal::service('plugin.manager.dynamic_entity_reference_selection')->getSelectionHandler($field_definition);
 
 								$autocreate = FALSE;
 								$autocreate_bundle = NULL;
@@ -1307,7 +1301,7 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 									elseif ($autocreate) {
 										// Auto-create item. See an example of how this is handled in
 										// \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::presave().
-										$new_entity = $handler->createNewEntity($options['target_type'], $autocreate_bundle, $value, \Drupal::currentUser()->id());
+										$new_entity = $handler->createNewEntity($field_definition->getSetting('target_type'), $autocreate_bundle, $value, \Drupal::currentUser()->id());
 										$new_entity->save();
 										$entity_ids[] = $new_entity->id();
 									}
@@ -1325,6 +1319,12 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 
 						$node->$field_machine_name = $entity_ids;
 						break;
+
+					case 'dynamic_entity_reference':
+
+						
+						break;
+
 					case 'image':
 						$val = null;
 						// Alt field
