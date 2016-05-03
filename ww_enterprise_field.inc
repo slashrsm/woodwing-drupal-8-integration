@@ -522,8 +522,7 @@ function getEnterpriseNodeFields( $contentType )
 				$nodeProperties['default_value'] = $nodeProperties['list_options'][$defaultId];
 			}
 
-			// @todo Temporary limit support for entity references to term references.
-			\Drupal::logger( 'ww_enterprise' )->warning('target_type:' . $field->getFieldStorageDefinition()->getSetting('target_type') );
+			// Special handling for taxonomy term references.
 			if ($nodeProperties['type'] == 'entity_reference' && $field->getFieldStorageDefinition()->getSetting('target_type') == 'taxonomy_term') {
 
 				$handlerSettings = $field->getSetting('handler_settings');
@@ -548,7 +547,7 @@ function getEnterpriseNodeFields( $contentType )
 			}
 			
 			// Support all other entity reference fields in a generic way.
-			elseif ($nodeProperties['type'] == 'entity_reference') {
+			elseif (in_array($nodeProperties['type'], ['entity_reference', 'dynamic_entity_reference', 'simplenews_issue']) {
 				$nodeProperties['vocabulary_name'] = 'entityreference';
 				$nodeProperties['type'] = 'entity_term_reference';
 				$nodeProperties['ww_term_entity'] = NULL;
@@ -948,8 +947,14 @@ function validateFieldDefinition( &$fieldDefinition, $type, &$warnOnly=false )
 				// Term references may have any cardinality.
 				break;
 			case 'entity_term_reference' :
-				// Term references may have any cardinality.
-				break;	
+				// Entity references may have any cardinality.
+				break;
+			case 'dynamic_entity_reference' :
+				// Dynamic entity references references may have any cardinality.
+				break;
+			case 'simplenews_issue' :
+				// Simplenews issue may have any cardinality.
+				break;
 			default : // Invalid so do nothing.
 				$errors[] = createError( $fieldName, 'Unsupported Field and Field type combination for: Type: \''
 					. $fieldDefinition['type'] . '\', Field: \'' . $fieldDefinition['widget_type'] . '\'. '  . $requiredFieldMessage,
@@ -1183,6 +1188,9 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 					case 'list_float':
 					case 'list_integer':
 					case 'list_string':
+
+					  \Drupal::logger( 'ww_enterprise' )->warning("values for list $field_machine_name: " . print_r($values, TRUE));
+
 						$listOptions = options_allowed_values( $node->$field_machine_name->getFieldDefinition()->getFieldStorageDefinition(), null);
 						$val = ''; // This is when user selected '- None -'.
 						$listValuesCount = count( $formValues[$key] );
@@ -1313,7 +1321,7 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 							}
 						}
 
-						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($values, TRUE));
+						\Drupal::logger( 'ww_enterprise' )->warning("ids for reference $field_machine_name: " . print_r($entity_ids, TRUE));
 
 						$node->$field_machine_name = $entity_ids;
 						break;

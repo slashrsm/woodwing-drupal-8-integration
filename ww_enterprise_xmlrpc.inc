@@ -1,4 +1,7 @@
 <?php
+
+use Drupal\dynamic_entity_reference\Plugin\Field\FieldType\DynamicEntityReferenceItem;
+
 /**
  * Implementation of xmlrpc().
  *
@@ -618,28 +621,50 @@ function ww_enterprise_xmlrpc_getEntityValues($type_uuid, $field_id, $searchValu
 
 	$field_definition = $field_definitions[$field_name];
 
-	$options = array(
-		'target_type' => $field_definition->getSetting('target_type'),
-		'handler' => $field_definition->getSetting('handler'),
-		'handler_settings' => $field_definition->getSetting('handler_settings'),
-	);
 
-	$handler = \Drupal::service('plugin.manager.entity_reference_selection')->getInstance($options);
-
-	$result = [];
-	if (isset($searchValue)) {
-		// Get an array of matching entities.
-		$match_operator = !empty($selection_settings['match_operator']) ? $selection_settings['match_operator'] : 'CONTAINS';
-		$entity_labels = $handler->getReferenceableEntities($searchValue, $match_operator, 10);
-
-		// Loop through the entities and convert them into autocomplete output.
-		foreach ($entity_labels as $values) {
-			foreach ($values as $entity_id => $label) {
-				$result[$entity_id] = $label . ' (' . $entity_id . ')';
+	switch ($field_definition->getType()) {
+		case 'entity_reference':
+		case 'simplenews_issue':
+		  $handler = \Drupal::service('plugin.manager.dynamic_entity_reference_selection')
+				->getSelectionHandler($field_definition);
+			$result = [];
+			// Get an array of matching entities.
+			$match_operator = !empty($field_definition->getSetting('handler_settings')['match_operator']) ? $field_definition->getSetting('handler_settings')['match_operator'] : 'CONTAINS';
+			$entity_labels = $handler->getReferenceableEntities($searchValue, $match_operator, 10);
+			// Loop through the entities and convert them into autocomplete output.
+			foreach ($entity_labels as $values) {
+				foreach ($values as $entity_id => $label) {
+					$result[$entity_id] = $label . ' (' . $entity_id . ')';
+				}
 			}
-		}
+			return $result;
+		break;
+
+		case 'dynamic_entity_reference':
+				$result = [];
+
+			// For dynamic references, loop over all target types and provide up to 4
+			// suggestions for each type.
+			foreach (DynamicEntityReferenceItem::getTargetTypes($field_definition->getSettings()) as $target_type) {
+				$handler = \Drupal::service('plugin.manager.dynamic_entity_reference_selection')
+					->getSelectionHandler($field_definition, NULL, $target_type);
+
+				// Get an array of matching entities.
+				$match_operator = !empty($selection_settings['match_operator']) ? $selection_settings['match_operator'] : 'CONTAINS';
+				$entity_labels = $handler->getReferenceableEntities($searchValue, $match_operator, 10);
+				$entity_type_label = \Drupal::entityTypeManager()->getDefinition($target_type)->getLabel();
+				// Loop through the entities and convert them into autocomplete output.
+				foreach ($entity_labels as $values) {
+					foreach ($values as $entity_id => $label) {
+						$result[$target_type . ':' .$entity_id] = $entity_type_label . ': ' . $label . ' (' . $target_type . ':' . $entity_id . ')';
+					}
+				}
+			}
+
+			return $result;
+			break;
+
+		default:
+			throw new \Exception('Unsuported field ' . $field_name . ' (' . $field_definition->getType() . ')')
 	}
-
-
-	return $result;
 }
