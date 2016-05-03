@@ -476,7 +476,6 @@ function getEnterpriseNodeFields( $contentType )
 				'dynamic_entity_reference_default'
 			);
 
-            \Drupal::logger( 'ww_enterprise' )->warning( $nodeProperties['name'] . ' ' . print_r($nodeProperties,1) );
 			if ( !in_array( $nodeProperties['widget_type'], $knownWidgets ) ) {
 				// Attempt to read out the default field type.
 				$defaultTypeInfo = \Drupal::service('plugin.manager.field.field_type')->getDefinition($nodeProperties['type']);
@@ -1313,7 +1312,7 @@ function mapNodeValues(NodeInterface $node, $formValues, $previewMode )
 										$entity_ids[] = $new_entity->id();
 									}
 									else {
-										\Drupal::logger( 'ww_enterprise' )->warning("values for reference $field_machine_name: " . print_r($values, TRUE));
+										\Drupal::logger( 'ww_enterprise' )->warning('Unknown value @value for field @field_name', ['@value' => $value, '@field_name' => $field_machine_name]);
 									}
 								}
 								else {
