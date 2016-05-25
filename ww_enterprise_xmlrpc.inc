@@ -384,6 +384,8 @@ function ww_enterprise_xmlrpc_saveNode( $dossierProps, $formValues, $attachments
 		// Map all the other fields for this call.
 		mapNodeValues( $node, $formValues, $dossierProps['Preview'] );
 
+		\Drupal::moduleHandler()->alter('ww_enterprise_node_map', $node, $formValues, $dossierProps);
+
 		// Save the node.
 		$node->uid = $uid;
 		$node->save();
